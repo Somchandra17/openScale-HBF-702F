@@ -56,6 +56,7 @@ data class ReportRow(
     val reading: String,
     val status: String,
     val normalRange: String,
+    val band: Band = Band.NONE,
 )
 
 data class ReportModel(
@@ -87,27 +88,56 @@ object ReportRowBuilder {
 
     private val SPECS = listOf(
         Spec(MeasurementTypeKey.WEIGHT, "Weight") { String.format(L, "%.1f kg", it) },
-        Spec(MeasurementTypeKey.BODY_FAT, "Body fat") { String.format(L, "%.1f %%", it) },
-        Spec(MeasurementTypeKey.MUSCLE, "Skeletal muscle") { String.format(L, "%.1f %%", it) },
+        Spec(MeasurementTypeKey.BODY_FAT, "Body fat %") { String.format(L, "%.1f %%", it) },
+        Spec(MeasurementTypeKey.MUSCLE, "Skeletal muscle %") { String.format(L, "%.1f %%", it) },
         Spec(MeasurementTypeKey.BMI, "BMI") { String.format(L, "%.1f", it) },
         Spec(MeasurementTypeKey.VISCERAL_FAT, "Visceral fat") { String.format(L, "%.1f", it) },
         Spec(MeasurementTypeKey.BMR, "Resting metabolism") { String.format(L, "%.0f kcal", it) },
         Spec(MeasurementTypeKey.BODY_AGE, "Body age") { String.format(L, "%.0f years", it) },
     )
 
-    /** [values] is keyed by [MeasurementTypeKey.name]; absent keys become dashed rows. */
-    fun build(values: Map<String, Float>, client: ClientBlock): List<ReportRow> =
-        SPECS.map { spec ->
-            val v = values[spec.key.name]
-            when {
-                v == null -> ReportRow(spec.label, DASH, DASH, DASH)
-                spec.key == MeasurementTypeKey.BODY_AGE -> bodyAgeRow(spec, v, client)
-                else -> {
-                    val c = ReferenceRanges.classify(spec.key, v, client.ageYears, client.gender)
-                    ReportRow(spec.label, spec.format(v), c.label, c.normalRange)
-                }
+    /**
+     * [values] is keyed by [MeasurementTypeKey.name]; absent keys become dashed rows.
+     *
+     * Fat mass and muscle mass are not sent by the HBF-702T; they are derived from the
+     * machine's weight × percentage so the sheet can show kg alongside %. TSF is not a
+     * scale output and is never invented.
+     */
+    fun build(values: Map<String, Float>, client: ClientBlock): List<ReportRow> {
+        val weight = values[MeasurementTypeKey.WEIGHT.name]
+        val fat = values[MeasurementTypeKey.BODY_FAT.name]
+        val muscle = values[MeasurementTypeKey.MUSCLE.name]
+        fun spec(key: MeasurementTypeKey) = SPECS.first { it.key == key }
+        return listOf(
+            machineRow(spec(MeasurementTypeKey.WEIGHT), values, client),
+            machineRow(spec(MeasurementTypeKey.BODY_FAT), values, client),
+            derivedMassRow("Fat mass", weight, fat),
+            machineRow(spec(MeasurementTypeKey.MUSCLE), values, client),
+            derivedMassRow("Muscle mass", weight, muscle),
+            machineRow(spec(MeasurementTypeKey.BMI), values, client),
+            machineRow(spec(MeasurementTypeKey.VISCERAL_FAT), values, client),
+            machineRow(spec(MeasurementTypeKey.BMR), values, client),
+            machineRow(spec(MeasurementTypeKey.BODY_AGE), values, client),
+        )
+    }
+
+    private fun machineRow(spec: Spec, values: Map<String, Float>, client: ClientBlock): ReportRow {
+        val v = values[spec.key.name]
+        return when {
+            v == null -> ReportRow(spec.label, DASH, DASH, DASH)
+            spec.key == MeasurementTypeKey.BODY_AGE -> bodyAgeRow(spec, v, client)
+            else -> {
+                val c = ReferenceRanges.classify(spec.key, v, client.ageYears, client.gender)
+                ReportRow(spec.label, spec.format(v), c.label, c.normalRange, c.band)
             }
         }
+    }
+
+    private fun derivedMassRow(label: String, weightKg: Float?, percent: Float?): ReportRow {
+        if (weightKg == null || percent == null) return ReportRow(label, DASH, DASH, DASH)
+        val kg = weightKg * percent / 100f
+        return ReportRow(label, String.format(L, "%.1f kg", kg), DASH, DASH)
+    }
 
     private fun bodyAgeRow(spec: Spec, value: Float, client: ClientBlock): ReportRow {
         // Mirrors PdfReportRenderer's own CLIENT_AGE_UNKNOWN guard: the reading is a real,

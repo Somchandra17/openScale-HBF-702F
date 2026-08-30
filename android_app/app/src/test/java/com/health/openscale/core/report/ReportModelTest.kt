@@ -28,7 +28,7 @@ class ReportModelTest {
         ReportRowBuilder.build(values.toMap(), client)
 
     @Test
-    fun `builds seven rows in a fixed order`() {
+    fun `builds nine rows in a fixed order including derived masses`() {
         val model = ReportModel(
             coach = coach,
             client = client,
@@ -39,18 +39,46 @@ class ReportModelTest {
                 "BMI" to 24.8f, "VISCERAL_FAT" to 8.5f, "BMR" to 1420f, "BODY_AGE" to 41f,
             ),
         )
-        assertThat(model.rows).hasSize(7)
+        assertThat(model.rows).hasSize(9)
         assertThat(model.rows.map { it.label }).containsExactly(
-            "Weight", "Body fat", "Skeletal muscle", "BMI",
-            "Visceral fat", "Resting metabolism", "Body age",
+            "Weight", "Body fat %", "Fat mass", "Skeletal muscle %", "Muscle mass",
+            "BMI", "Visceral fat", "Resting metabolism", "Body age",
         ).inOrder()
+    }
+
+    @Test
+    fun `fat mass is weight times body-fat percent, in kg`() {
+        val row = rowsFor("WEIGHT" to 68.4f, "BODY_FAT" to 28.1f).single { it.label == "Fat mass" }
+        assertThat(row.reading).isEqualTo("19.2 kg")
+        assertThat(row.status).isEqualTo("—")
+        assertThat(row.band).isEqualTo(Band.NONE)
+    }
+
+    @Test
+    fun `muscle mass is weight times skeletal-muscle percent, in kg`() {
+        val row = rowsFor("WEIGHT" to 68.4f, "MUSCLE" to 31.0f).single { it.label == "Muscle mass" }
+        assertThat(row.reading).isEqualTo("21.2 kg")
+        assertThat(row.status).isEqualTo("—")
+    }
+
+    @Test
+    fun `derived mass rows dash when a factor is missing`() {
+        val noWeight = rowsFor("BODY_FAT" to 28.1f).single { it.label == "Fat mass" }
+        assertThat(noWeight.reading).isEqualTo("—")
+        val noPercent = rowsFor("WEIGHT" to 68.4f).single { it.label == "Fat mass" }
+        assertThat(noPercent.reading).isEqualTo("—")
+    }
+
+    @Test
+    fun `TSF is never a row`() {
+        assertThat(rowsFor("WEIGHT" to 68.4f).map { it.label }).doesNotContain("TSF")
     }
 
     @Test
     fun `a missing metric still produces a row with dashes`() {
         // The sheet's shape must be constant; never omit a row.
         val rows = rowsFor("WEIGHT" to 68.4f)
-        val fatRow = rows.single { it.label == "Body fat" }
+        val fatRow = rows.single { it.label == "Body fat %" }
         assertThat(fatRow.reading).isEqualTo("—")
         assertThat(fatRow.status).isEqualTo("—")
     }
@@ -65,10 +93,11 @@ class ReportModelTest {
 
     @Test
     fun `body fat row is classified against the client's age and sex`() {
-        val row = rowsFor("BODY_FAT" to 28.1f).single { it.label == "Body fat" }
+        val row = rowsFor("BODY_FAT" to 28.1f).single { it.label == "Body fat %" }
         assertThat(row.reading).isEqualTo("28.1 %")
         assertThat(row.status).isEqualTo("Normal")
         assertThat(row.normalRange).isEqualTo("21.0 – 32.9 %")
+        assertThat(row.band).isEqualTo(Band.NORMAL)
     }
 
     @Test
@@ -77,14 +106,16 @@ class ReportModelTest {
         assertThat(row.reading).isEqualTo("24.8")
         assertThat(row.status).isEqualTo("Overweight")
         assertThat(row.normalRange).isEqualTo("18.0 – 22.9")
+        assertThat(row.band).isEqualTo(Band.HIGH)
     }
 
     @Test
     fun `skeletal muscle row is classified against the client's age and sex`() {
-        val row = rowsFor("MUSCLE" to 31.0f).single { it.label == "Skeletal muscle" }
+        val row = rowsFor("MUSCLE" to 31.0f).single { it.label == "Skeletal muscle %" }
         assertThat(row.reading).isEqualTo("31.0 %")
         assertThat(row.status).isEqualTo("High")
         assertThat(row.normalRange).isEqualTo("24.3 – 30.3 %")
+        assertThat(row.band).isEqualTo(Band.HIGH)
     }
 
     @Test
@@ -126,7 +157,7 @@ class ReportModelTest {
     @Test
     fun `an unset profile yields Band NONE (a dash) for body fat, not a guessed verdict`() {
         val row = ReportRowBuilder.build(mapOf("BODY_FAT" to 30.0f), clientWithUnsetProfile)
-            .single { it.label == "Body fat" }
+            .single { it.label == "Body fat %" }
         assertThat(row.status).isEqualTo("—")
         assertThat(row.normalRange).isEqualTo("—")
     }
@@ -134,7 +165,7 @@ class ReportModelTest {
     @Test
     fun `an unset profile yields Band NONE (a dash) for skeletal muscle, not a guessed verdict`() {
         val row = ReportRowBuilder.build(mapOf("MUSCLE" to 31.0f), clientWithUnsetProfile)
-            .single { it.label == "Skeletal muscle" }
+            .single { it.label == "Skeletal muscle %" }
         assertThat(row.status).isEqualTo("—")
         assertThat(row.normalRange).isEqualTo("—")
     }
@@ -145,9 +176,9 @@ class ReportModelTest {
         // rows must band, proving the fallback is scoped to the missing-profile case only.
         val rows = ReportRowBuilder.build(mapOf("BODY_FAT" to 30.0f, "MUSCLE" to 31.0f), client)
 
-        val bodyFat = rows.single { it.label == "Body fat" }
+        val bodyFat = rows.single { it.label == "Body fat %" }
         assertThat(bodyFat.status).isEqualTo("Normal") // 34yo female normal range is 21.0-32.9
-        val muscle = rows.single { it.label == "Skeletal muscle" }
+        val muscle = rows.single { it.label == "Skeletal muscle %" }
         assertThat(muscle.status).isEqualTo("High") // 34yo female normal range tops out at 30.3
     }
 

@@ -211,5 +211,12 @@ class ReportViewModel @Inject constructor(
         measurementId: Int,
         uri: Uri,
         resolver: ContentResolver,
-    ): Result<Unit> = reportUseCases.exportPdf(userId, measurementId, uri, resolver)
+        artwork: Map<String, ByteArray> = emptyMap(),
+    ): Result<Unit> = reportUseCases.exportPdf(userId, measurementId, uri, resolver, artwork)
+
+    suspend fun renderPdf(
+        userId: Int,
+        measurementId: Int,
+        artwork: Map<String, ByteArray> = emptyMap(),
+    ): Result<Pair<ByteArray, String>> = reportUseCases.renderPdf(userId, measurementId, artwork)
 }

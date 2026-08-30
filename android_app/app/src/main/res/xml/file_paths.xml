@@ -8,4 +8,7 @@
     <external-files-path
         name="log_files"
         path="logs/" />
+    <cache-path
+        name="share_reports"
+        path="reports/" />
 </paths>

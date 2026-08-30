@@ -17,8 +17,12 @@
  */
 package com.health.openscale.core.report
 
+import android.content.res.AssetManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import java.io.ByteArrayOutputStream
@@ -32,26 +36,45 @@ import java.time.format.DateTimeFormatter
  * layout unit-testable on the JVM with a plain recording fake, with no Robolectric
  * involved — see the doc comment on [render] for why that split exists.
  *
- * ## Printed in black and white
- * The practice prints on a mono laser, so the palette is greyscale only and status is
- * carried by the word plus the adjacent range — never by colour. The sheet must stay
- * readable as a photocopy.
+ * Status colour is an extra signal on top of the word: High/Low also print bold so a
+ * monochrome laser still carries the verdict.
  */
+object ReportArtwork {
+    const val LOGO = "logo"
+    const val FOOTER = "footer"
+
+    fun load(assets: AssetManager): Map<String, ByteArray> = mapOf(
+        LOGO to assets.open("report/logo.png").use { it.readBytes() },
+        FOOTER to assets.open("report/footer.png").use { it.readBytes() },
+    )
+}
+
 object PdfReportRenderer {
 
     // A4 at 72 dpi.
     const val PAGE_W = 595
     const val PAGE_H = 842
-    private const val MARGIN = 42f
+    const val MARGIN = 40f
+
+    // Cropped pixel aspects of assets/report/{logo,footer}.png.
+    const val LOGO_ASPECT_W_OVER_H = 1122f / 1156f
+    const val FOOTER_ASPECT_W_OVER_H = 2055f / 747f
+    const val LOGO_H = 56f
+    val LOGO_W = LOGO_H * LOGO_ASPECT_W_OVER_H
+    const val CLUB_SIZE = 22f
+    const val COACH_NAME_SIZE = 12f
 
     // Not `const val`: 0xFF000000.toInt() is not a compile-time constant in Kotlin.
     val INK = 0xFF000000.toInt()
     val INK_SOFT = 0xFF666666.toInt()
     val HEADER_FILL = 0xFFE6E6E6.toInt()
     val RULE = 0xFFCCCCCC.toInt()
+    val STATUS_HIGH = 0xFF8B1A1A.toInt()
+    val STATUS_LOW = 0xFF0D47A1.toInt()
 
-    /** Every colour this renderer may use. Asserted greyscale by test. */
-    val PALETTE = listOf(INK, INK_SOFT, HEADER_FILL, RULE)
+    /** Greyscale inks used for everything except abnormal status. */
+    val GREY_PALETTE = listOf(INK, INK_SOFT, HEADER_FILL, RULE)
+    val PALETTE = GREY_PALETTE + listOf(STATUS_HIGH, STATUS_LOW)
 
     private val L = java.util.Locale.US
     private val DATE_FMT = DateTimeFormatter.ofPattern("dd MMM yyyy", L)
@@ -73,24 +96,38 @@ object PdfReportRenderer {
      */
     fun draw(model: ReportModel, canvas: ReportCanvas) {
         val m = model
-        var y = MARGIN + 24f
-
-        // -- Masthead: the coach's identity, never the app's ----------------------
-        // Free text the coach types into their profile — unlike the measurement table,
-        // nothing here is format-bounded, so every line is ellipsized to the page's
-        // usable width rather than trusting it to be short.
         val pageUsableWidth = PAGE_W - 2 * MARGIN
-        val nameStyle = TextStyle(20f, INK, bold = true)
-        canvas.drawText(ellipsize(m.coach.name.uppercase(), nameStyle, pageUsableWidth, canvas), MARGIN, y, nameStyle)
-        y += 18f
+        val tableRight = PAGE_W - MARGIN
+        val footerW = pageUsableWidth
+        val footerH = footerW / FOOTER_ASPECT_W_OVER_H
+        val footerTop = PAGE_H - MARGIN - footerH
+
+        // -- Masthead: logo + club name as the H1, coach identity underneath ------
+        val mastheadTop = MARGIN
+        canvas.drawImage(ReportArtwork.LOGO, MARGIN, mastheadTop, LOGO_W, LOGO_H)
+        val textX = MARGIN + LOGO_W + 10f
+        val textMax = (PAGE_W - MARGIN) - textX
+        var textY = mastheadTop + 22f
+        val clubStyle = TextStyle(CLUB_SIZE, INK, bold = true)
+        if (m.coach.club.isNotBlank()) {
+            canvas.drawText(ellipsize(m.coach.club, clubStyle, textMax, canvas), textX, textY, clubStyle)
+            textY += 16f
+        }
+        val nameStyle = TextStyle(COACH_NAME_SIZE, INK, bold = false)
+        canvas.drawText(ellipsize(m.coach.name, nameStyle, textMax, canvas), textX, textY, nameStyle)
+        textY += 14f
         val titleStyle = TextStyle(11f, INK_SOFT)
-        canvas.drawText(ellipsize(m.coach.title, titleStyle, pageUsableWidth, canvas), MARGIN, y, titleStyle)
-        y += 14f
+        canvas.drawText(ellipsize(m.coach.title, titleStyle, textMax, canvas), textX, textY, titleStyle)
+        textY += 13f
         val contactStyle = TextStyle(9f, INK_SOFT)
-        val contactLine = listOf(m.coach.phone, m.coach.email, m.coach.club).filter { it.isNotBlank() }.joinToString(" · ")
-        canvas.drawText(ellipsize(contactLine, contactStyle, pageUsableWidth, canvas), MARGIN, y, contactStyle)
+        val contactLine = listOf(m.coach.phone, m.coach.email).filter { it.isNotBlank() }.joinToString(" · ")
+        if (contactLine.isNotBlank()) {
+            canvas.drawText(ellipsize(contactLine, contactStyle, textMax, canvas), textX, textY, contactStyle)
+            textY += 12f
+        }
+        var y = maxOf(mastheadTop + LOGO_H + 14f, textY + 6f)
+        rule(canvas, y)
         y += 20f
-        rule(canvas, y); y += 22f
 
         // -- Client block ---------------------------------------------------------
         val col2 = PAGE_W / 2f
@@ -114,16 +151,15 @@ object PdfReportRenderer {
             }
             canvas.drawText(r.rightLabel, col2, y, labelStyle)
             canvas.drawText(ellipsize(r.rightValue, valueStyle, rightValueMaxWidth, canvas), col2 + 55f, y, valueStyle)
-            y += 15f
+            y += 16f
         }
-        y += 10f
+        y += 12f
 
         // -- Measurement table ----------------------------------------------------
         val cols = floatArrayOf(MARGIN, MARGIN + 150f, MARGIN + 250f, MARGIN + 360f)
-        val tableRight = PAGE_W - MARGIN
-        val headerH = 20f
+        val headerH = 22f
 
-        canvas.drawRect(MARGIN, y - 13f, tableRight, y - 13f + headerH, HEADER_FILL)
+        canvas.drawRect(MARGIN, y - 14f, tableRight, y - 14f + headerH, HEADER_FILL)
         val headStyle = TextStyle(9f, INK, bold = true)
         canvas.drawText("Measurement", cols[0] + 4f, y, headStyle)
         canvas.drawText("Reading", cols[1], y, headStyle)
@@ -131,9 +167,6 @@ object PdfReportRenderer {
         canvas.drawText("Normal range", cols[3], y, headStyle)
         y += headerH
 
-        // Column widths for ellipsize: label/reading/status risk is low (fixed labels,
-        // format-bounded readings) but normalRange is a built string, not fixed-width —
-        // "low risk" is not "guarded", so every cell gets the same width bound.
         val rangeStyle = TextStyle(9f, INK_SOFT)
         val colWidths = floatArrayOf(
             cols[1] - (cols[0] + 4f),
@@ -142,21 +175,19 @@ object PdfReportRenderer {
             tableRight - cols[3],
         )
         m.rows.forEach { r ->
+            val statusStyle = statusStyle(r.band)
             canvas.drawText(ellipsize(r.label, valueStyle, colWidths[0], canvas), cols[0] + 4f, y, valueStyle)
             canvas.drawText(ellipsize(r.reading, valueStyle, colWidths[1], canvas), cols[1], y, valueStyle)
-            canvas.drawText(ellipsize(r.status, valueStyle, colWidths[2], canvas), cols[2], y, valueStyle)
+            canvas.drawText(ellipsize(r.status, statusStyle, colWidths[2], canvas), cols[2], y, statusStyle)
             canvas.drawText(ellipsize(r.normalRange, rangeStyle, colWidths[3], canvas), cols[3], y, rangeStyle)
-            y += 8f
+            y += 10f
             rule(canvas, y)
-            y += 14f
+            y += 16f
         }
 
         // -- Footnotes ------------------------------------------------------------
-        y += 8f
+        y += 10f
         val noteStyle = TextStyle(8f, INK_SOFT)
-        // An unset birth date must not make this footnote claim a basis ("18-year-old male")
-        // the sheet does not actually have — the very verdicts above it are dashed out for the
-        // same reason. See finding B4.
         val ageSexNote = if (ageKnown) {
             val sex = m.client.gender.name.lowercase()
             "Ranges shown are for a ${m.client.ageYears}-year-old $sex."
@@ -164,17 +195,27 @@ object PdfReportRenderer {
             "Client age not on file — age- and sex-based ranges are not shown."
         }
         canvas.drawText(ageSexNote, MARGIN, y, noteStyle)
-        y += 11f
+        y += 12f
         canvas.drawText("Measured on ${m.deviceName}. Not a medical diagnosis.", MARGIN, y, noteStyle)
 
-        // -- Remarks: the only blank on the sheet ---------------------------------
-        y += 30f
-        canvas.drawText("Remarks", MARGIN, y, TextStyle(9f, INK, bold = true))
-        y += 6f
-        repeat(2) {
-            y += 18f
-            canvas.drawLine(MARGIN + 55f, y, tableRight, y, RULE)
+        // -- Remarks: kept above the footer so there is room to write --------------
+        y += 24f
+        canvas.drawText("Remarks", MARGIN, y, TextStyle(11f, INK, bold = true))
+        y += 8f
+        repeat(3) {
+            y += 20f
+            if (y < footerTop - 8f) {
+                canvas.drawLine(MARGIN + 70f, y, tableRight, y, RULE)
+            }
         }
+
+        canvas.drawImage(ReportArtwork.FOOTER, MARGIN, footerTop, footerW, footerH)
+    }
+
+    private fun statusStyle(band: Band): TextStyle = when (band) {
+        Band.HIGH, Band.VERY_HIGH -> TextStyle(10f, STATUS_HIGH, bold = true)
+        Band.LOW -> TextStyle(10f, STATUS_LOW, bold = true)
+        else -> TextStyle(10f, INK, bold = false)
     }
 
     private fun rule(canvas: ReportCanvas, y: Float) =
@@ -211,10 +252,14 @@ object PdfReportRenderer {
      * the real rendering, can only be verified by running the app on a device (tracked on
      * the sign-off list).
      */
-    fun render(model: ReportModel): ByteArray {
+    fun render(model: ReportModel, artwork: Map<String, ByteArray> = emptyMap()): ByteArray {
+        val bitmaps = HashMap<String, Bitmap>()
+        artwork.forEach { (key, bytes) ->
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.let { bitmaps[key] = it }
+        }
         val doc = PdfDocument()
         val page = doc.startPage(PdfDocument.PageInfo.Builder(PAGE_W, PAGE_H, 1).create())
-        draw(model, AndroidReportCanvas(page.canvas))
+        draw(model, AndroidReportCanvas(page.canvas, bitmaps))
         doc.finishPage(page)
 
         val out = ByteArrayOutputStream()
@@ -224,7 +269,10 @@ object PdfReportRenderer {
     }
 
     /** Maps [ReportCanvas] calls onto a real Android [Canvas]/[Paint]. See [render]. */
-    private class AndroidReportCanvas(private val canvas: Canvas) : ReportCanvas {
+    private class AndroidReportCanvas(
+        private val canvas: Canvas,
+        private val bitmaps: Map<String, Bitmap> = emptyMap(),
+    ) : ReportCanvas {
 
         override fun drawText(text: String, x: Float, y: Float, style: TextStyle) {
             canvas.drawText(text, x, y, paint(style))
@@ -239,6 +287,16 @@ object PdfReportRenderer {
         }
 
         override fun measureText(text: String, style: TextStyle): Float = paint(style).measureText(text)
+
+        override fun drawImage(key: String, left: Float, top: Float, width: Float, height: Float) {
+            val bmp = bitmaps[key] ?: return
+            canvas.drawBitmap(
+                bmp,
+                null,
+                RectF(left, top, left + width, top + height),
+                Paint().apply { isAntiAlias = true; isFilterBitmap = true },
+            )
+        }
 
         private fun paint(style: TextStyle) = Paint().apply {
             isAntiAlias = true

@@ -93,6 +93,19 @@ class ReportUseCases @Inject constructor(
     )
 
     /**
+     * Renders the report and returns the PDF bytes plus the suggested file name.
+     * Artwork (logo/footer) is loaded by the caller from [ReportArtwork.load].
+     */
+    suspend fun renderPdf(
+        userId: Int,
+        measurementId: Int,
+        artwork: Map<String, ByteArray> = emptyMap(),
+    ): Result<Pair<ByteArray, String>> = runCatching {
+        val model = buildModel(userId, measurementId).getOrThrow()
+        PdfReportRenderer.render(model, artwork) to suggestedFileName(model)
+    }
+
+    /**
      * Renders the report for [userId]/[measurementId] and writes it to [uri] via SAF.
      * The renderer itself is a thin Android/Skia adapter (see [PdfReportRenderer.render])
      * and is not covered by a JVM test for that reason.
@@ -102,9 +115,9 @@ class ReportUseCases @Inject constructor(
         measurementId: Int,
         uri: Uri,
         resolver: ContentResolver,
+        artwork: Map<String, ByteArray> = emptyMap(),
     ): Result<Unit> = runCatching {
-        val model = buildModel(userId, measurementId).getOrThrow()
-        val bytes = PdfReportRenderer.render(model)
+        val (bytes, _) = renderPdf(userId, measurementId, artwork).getOrThrow()
         withContext(Dispatchers.IO) {
             resolver.openOutputStream(uri)?.use { it.write(bytes) }
                 ?: error("Cannot open OutputStream for uri=$uri")

@@ -18,7 +18,9 @@
 package com.health.openscale.ui.screen.home
 
 import com.health.openscale.core.data.ConnectionStatus
+import com.health.openscale.core.data.GenderType
 import com.health.openscale.core.data.MeasurementTypeKey
+import com.health.openscale.core.data.User
 import com.health.openscale.core.model.MeasurementWithValues
 import java.util.Locale
 
@@ -45,6 +47,8 @@ sealed interface HomeUiState {
      * outside this screen consumes [HomeUiState], so widening it is safe.
      */
     data class Reading(
+        val measurementId: Int,
+        val measuredAt: Long,
         val weightKg: Float,
         val deltaKg: Float,
         val fatPercent: Float,
@@ -52,6 +56,52 @@ sealed interface HomeUiState {
         val bmi: Float,
         val visceralFat: Float,
     ) : HomeUiState
+}
+
+/**
+ * The Home "Edit person" form. Pure so [applyTo] / [from] can be unit-tested without Compose.
+ * [birthDate] uses the same 0L "not set" sentinel as [User.birthDate].
+ */
+data class ClientEditUiState(
+    val name: String,
+    val phone: String,
+    val email: String,
+    val birthDate: Long,
+    val gender: GenderType,
+    val heightCm: String,
+) {
+    fun isValid(): Boolean {
+        val height = heightCm.replace(',', '.').toFloatOrNull() ?: return false
+        return name.isNotBlank() && height > 0f
+    }
+
+    fun applyTo(user: User): User? {
+        if (!isValid()) return null
+        val height = heightCm.replace(',', '.').toFloatOrNull() ?: return null
+        return user.copy(
+            name = name.trim(),
+            phone = phone.trim(),
+            email = email.trim(),
+            birthDate = birthDate,
+            gender = gender,
+            heightCm = height,
+        )
+    }
+
+    companion object {
+        fun from(user: User) = ClientEditUiState(
+            name = user.name,
+            phone = user.phone,
+            email = user.email,
+            birthDate = user.birthDate,
+            gender = user.gender,
+            heightCm = if (user.heightCm > 0f) {
+                String.format(java.util.Locale.US, "%.0f", user.heightCm)
+            } else {
+                ""
+            },
+        )
+    }
 }
 
 /**
@@ -74,6 +124,8 @@ object HomeStateMapper {
             ?.let { valuesByKey(it)[MeasurementTypeKey.WEIGHT.name] }
 
         return HomeUiState.Reading(
+            measurementId = latest.measurement.id,
+            measuredAt = latest.measurement.timestamp,
             weightKg = weightKg,
             deltaKg = previousWeight?.let { weightKg - it } ?: 0f,
             fatPercent = latestValues[MeasurementTypeKey.BODY_FAT.name] ?: 0f,
@@ -110,10 +162,44 @@ object HomeDisplay {
     fun visceralFatLabel(value: Float): String = String.format(L, "%.1f", value)
 
     /**
-     * Whether the sync button should show its busy state. Mirrors the "isBusy" decision
-     * [com.health.openscale.ui.screen.components.rememberBluetoothActionButton] renders as a
-     * spinner icon: a handshake in either direction is in progress.
+     * Spinner stays up from the first CONNECTING through CONNECTED (the scale is still
+     * sending records) until a newer measurement lands, or the handshake ends with
+     * nothing new. Tapping Sync before Bluetooth permission is granted must not latch
+     * the spinner forever — [advanceSyncWait] only arms once CONNECTING is seen.
      */
-    fun isSyncing(status: ConnectionStatus): Boolean =
-        status == ConnectionStatus.CONNECTING || status == ConnectionStatus.DISCONNECTING
+    data class SyncWait(
+        val awaiting: Boolean = false,
+        val baselineTimestamp: Long? = null,
+        val seenHandshake: Boolean = false,
+    )
+
+    fun isHandshake(status: ConnectionStatus): Boolean =
+        status == ConnectionStatus.CONNECTING ||
+            status == ConnectionStatus.CONNECTED ||
+            status == ConnectionStatus.DISCONNECTING
+
+    fun isBusy(status: ConnectionStatus, wait: SyncWait): Boolean =
+        wait.awaiting || isHandshake(status)
+
+    fun advanceSyncWait(
+        wait: SyncWait,
+        status: ConnectionStatus,
+        newestTimestamp: Long?,
+    ): SyncWait {
+        val handshake = isHandshake(status)
+        if (!wait.awaiting && handshake) {
+            return SyncWait(awaiting = true, baselineTimestamp = newestTimestamp, seenHandshake = true)
+        }
+        if (!wait.awaiting) return wait
+        if (newestTimestamp != null && newestTimestamp != wait.baselineTimestamp) return SyncWait()
+        val seen = wait.seenHandshake || handshake
+        if (seen && (status == ConnectionStatus.FAILED ||
+                status == ConnectionStatus.DISCONNECTED ||
+                status == ConnectionStatus.NONE)
+        ) {
+            return SyncWait()
+        }
+        return wait.copy(seenHandshake = seen)
+    }
+
 }

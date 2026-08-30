@@ -25,7 +25,7 @@ class PdfReportRendererTest {
 
     // Mirrors PdfReportRenderer.draw's private layout geometry so a test can address a
     // specific cell. If the renderer's column geometry changes, these move with it.
-    private val margin = 42f
+    private val margin = PdfReportRenderer.MARGIN
     private val col2 = PdfReportRenderer.PAGE_W / 2f
     private val labelColX = margin + 4f
     private val readingColX = margin + 150f
@@ -34,6 +34,7 @@ class PdfReportRendererTest {
     private val pageUsableWidth = PdfReportRenderer.PAGE_W - 2 * margin
     private val tableRight = PdfReportRenderer.PAGE_W - margin
     private val rangeColWidth = tableRight - rangeColX
+    private val mastheadTextX = margin + PdfReportRenderer.LOGO_W + 10f
 
     private fun model() = ReportModel(
         coach = CoachBlock("Reena Chandra", "Weight Loss Coach", "Fit Studio", "98xxxxxxxx", "reena@example.com"),
@@ -53,6 +54,7 @@ class PdfReportRendererTest {
         data class Text(val text: String, val x: Float, val y: Float, val style: TextStyle) : DrawCall()
         data class Rect(val left: Float, val top: Float, val right: Float, val bottom: Float, val colour: Int) : DrawCall()
         data class Line(val startX: Float, val startY: Float, val stopX: Float, val stopY: Float, val colour: Int) : DrawCall()
+        data class Image(val key: String, val left: Float, val top: Float, val width: Float, val height: Float) : DrawCall()
     }
 
     /**
@@ -78,20 +80,26 @@ class PdfReportRendererTest {
 
         override fun measureText(text: String, style: TextStyle): Float = text.length * style.size * 0.5f
 
+        override fun drawImage(key: String, left: Float, top: Float, width: Float, height: Float) {
+            calls += DrawCall.Image(key, left, top, width, height)
+        }
+
         val texts get() = calls.filterIsInstance<DrawCall.Text>()
+        val images get() = calls.filterIsInstance<DrawCall.Image>()
     }
 
     private fun recordDraw(model: ReportModel = model()): RecordingCanvas =
         RecordingCanvas().also { PdfReportRenderer.draw(model, it) }
 
     @Test
-    fun `draws seven rows in order with expected labels`() {
+    fun `draws nine rows in order with expected labels`() {
         val canvas = recordDraw()
         val expected = model().rows.map { it.label }
         // Non-bold distinguishes the row cells from the (also non-bold at other columns,
         // but bold here) table header sharing the same x.
         val drawnLabels = canvas.texts.filter { it.x == labelColX && !it.style.bold }.map { it.text }
         assertThat(drawnLabels).isEqualTo(expected)
+        assertThat(drawnLabels).hasSize(9)
     }
 
     @Test
@@ -100,14 +108,62 @@ class PdfReportRendererTest {
         val canvas = recordDraw(dashedModel)
 
         val drawnLabels = canvas.texts.filter { it.x == labelColX && !it.style.bold }.map { it.text }
-        assertThat(drawnLabels).hasSize(7) // every row still drawn, none skipped
+        assertThat(drawnLabels).hasSize(9) // every row still drawn, none skipped
 
         val readings = canvas.texts.filter { it.x == readingColX && !it.style.bold }.map { it.text }
         val statuses = canvas.texts.filter { it.x == statusColX && !it.style.bold }.map { it.text }
         val ranges = canvas.texts.filter { it.x == rangeColX && !it.style.bold }.map { it.text }
-        assertThat(readings).containsExactlyElementsIn(List(7) { "—" })
-        assertThat(statuses).containsExactlyElementsIn(List(7) { "—" })
-        assertThat(ranges).containsExactlyElementsIn(List(7) { "—" })
+        assertThat(readings).containsExactlyElementsIn(List(9) { "—" })
+        assertThat(statuses).containsExactlyElementsIn(List(9) { "—" })
+        assertThat(ranges).containsExactlyElementsIn(List(9) { "—" })
+    }
+
+    @Test
+    fun `club name is the masthead, coach name is not`() {
+        val canvas = recordDraw()
+        val club = canvas.texts.single { it.text == "Fit Studio" }
+        assertThat(club.style.size).isEqualTo(PdfReportRenderer.CLUB_SIZE)
+        assertThat(club.style.bold).isTrue()
+        assertThat(club.x).isEqualTo(mastheadTextX)
+
+        val coach = canvas.texts.single { it.text == "Reena Chandra" }
+        assertThat(coach.style.size).isEqualTo(PdfReportRenderer.COACH_NAME_SIZE)
+        assertThat(coach.style.bold).isFalse()
+        assertThat(coach.x).isEqualTo(mastheadTextX)
+    }
+
+    @Test
+    fun `logo sits top-left beside the club name and footer pins to the bottom`() {
+        val canvas = recordDraw()
+        val logo = canvas.images.single { it.key == ReportArtwork.LOGO }
+        assertThat(logo.left).isEqualTo(margin)
+        assertThat(logo.top).isEqualTo(margin)
+        assertThat(logo.height).isEqualTo(PdfReportRenderer.LOGO_H)
+
+        val footer = canvas.images.single { it.key == ReportArtwork.FOOTER }
+        assertThat(footer.left).isEqualTo(margin)
+        assertThat(footer.width).isEqualTo(pageUsableWidth)
+        assertThat(footer.top + footer.height).isEqualTo(PdfReportRenderer.PAGE_H - margin)
+    }
+
+    @Test
+    fun `Remarks is still drawn above the footer`() {
+        val canvas = recordDraw()
+        val remarks = canvas.texts.single { it.text == "Remarks" }
+        val footer = canvas.images.single { it.key == ReportArtwork.FOOTER }
+        assertThat(remarks.y).isLessThan(footer.top)
+    }
+
+    @Test
+    fun `an abnormal status is bold and uses the high or low colour`() {
+        val canvas = recordDraw()
+        val high = canvas.texts.single { it.x == statusColX && it.text == "High" }
+        assertThat(high.style.bold).isTrue()
+        assertThat(high.style.colour).isEqualTo(PdfReportRenderer.STATUS_HIGH)
+
+        val overweight = canvas.texts.single { it.x == statusColX && it.text == "Overweight" }
+        assertThat(overweight.style.bold).isTrue()
+        assertThat(overweight.style.colour).isEqualTo(PdfReportRenderer.STATUS_HIGH)
     }
 
     @Test
@@ -127,25 +183,24 @@ class PdfReportRendererTest {
     fun `an overlong coach name does not run off the masthead`() {
         val m = model().copy(coach = model().coach.copy(name = "A".repeat(200)))
         val canvas = recordDraw(m)
-        val nameStyle = TextStyle(20f, PdfReportRenderer.INK, bold = true)
+        val nameStyle = TextStyle(PdfReportRenderer.COACH_NAME_SIZE, PdfReportRenderer.INK, bold = false)
+        val textMax = (PdfReportRenderer.PAGE_W - margin) - mastheadTextX
 
-        val nameCall = canvas.texts.first { it.x == margin && it.style == nameStyle }
-        assertThat(canvas.measureText(nameCall.text, nameCall.style)).isAtMost(pageUsableWidth)
-        assertThat(nameCall.text.length).isLessThan(200) // really trimmed, not coincidentally short
+        val nameCall = canvas.texts.first { it.x == mastheadTextX && it.style == nameStyle && it.text.startsWith("A") }
+        assertThat(canvas.measureText(nameCall.text, nameCall.style)).isAtMost(textMax)
+        assertThat(nameCall.text.length).isLessThan(200)
     }
 
     @Test
-    fun `an overlong club name does not run the contact line off the page`() {
+    fun `an overlong club name does not run the masthead off the page`() {
         val m = model().copy(coach = model().coach.copy(club = "A".repeat(200)))
         val canvas = recordDraw(m)
-        val contactStyle = TextStyle(9f, PdfReportRenderer.INK_SOFT)
-        val untrimmedLength = m.coach.phone.length + 3 + m.coach.email.length + 3 + m.coach.club.length
+        val clubStyle = TextStyle(PdfReportRenderer.CLUB_SIZE, PdfReportRenderer.INK, bold = true)
+        val textMax = (PdfReportRenderer.PAGE_W - margin) - mastheadTextX
 
-        // Distinguished from the client block's same-style labels ("Client"/"Phone"/…)
-        // by content: only the joined contact line carries the coach's phone number.
-        val contactCall = canvas.texts.first { it.style == contactStyle && it.text.contains(m.coach.phone) }
-        assertThat(canvas.measureText(contactCall.text, contactCall.style)).isAtMost(pageUsableWidth)
-        assertThat(contactCall.text.length).isLessThan(untrimmedLength) // really trimmed
+        val clubCall = canvas.texts.first { it.style == clubStyle && it.text.startsWith("A") }
+        assertThat(canvas.measureText(clubCall.text, clubCall.style)).isAtMost(textMax)
+        assertThat(clubCall.text.length).isLessThan(200)
     }
 
     @Test
@@ -188,27 +243,36 @@ class PdfReportRendererTest {
                     assertThat(call.startY).isAtLeast(0f)
                     assertThat(call.stopY).isAtMost(pageH)
                 }
+                is DrawCall.Image -> {
+                    assertThat(call.left).isAtLeast(0f)
+                    assertThat(call.left + call.width).isAtMost(pageW)
+                    assertThat(call.top).isAtLeast(0f)
+                    assertThat(call.top + call.height).isAtMost(pageH)
+                }
             }
         }
     }
 
     @Test
-    fun `every colour drawn is greyscale`() {
+    fun `non-status colours drawn are greyscale`() {
         val canvas = recordDraw()
+        val statusColours = setOf(PdfReportRenderer.STATUS_HIGH, PdfReportRenderer.STATUS_LOW)
         canvas.calls.forEach { call ->
             val colour = when (call) {
                 is DrawCall.Text -> call.style.colour
                 is DrawCall.Rect -> call.colour
                 is DrawCall.Line -> call.colour
+                is DrawCall.Image -> return@forEach
             }
-            assertThat(isGrey(colour)).isTrue()
+            if (colour !in statusColours) assertThat(isGrey(colour)).isTrue()
         }
     }
 
     @Test
-    fun `every colour emitted is greyscale`() {
-        // A colour survives print only as a grey; verify none is ever set.
-        assertThat(PdfReportRenderer.PALETTE.all { isGrey(it) }).isTrue()
+    fun `layout inks stay greyscale, status inks are the only exception`() {
+        assertThat(PdfReportRenderer.GREY_PALETTE.all { isGrey(it) }).isTrue()
+        assertThat(isGrey(PdfReportRenderer.STATUS_HIGH)).isFalse()
+        assertThat(isGrey(PdfReportRenderer.STATUS_LOW)).isFalse()
     }
 
     @Test

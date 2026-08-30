@@ -19,6 +19,7 @@ package com.health.openscale.ui.screen.home
 
 import com.google.common.truth.Truth.assertThat
 import com.health.openscale.core.data.ConnectionStatus
+import com.health.openscale.core.data.GenderType
 import com.health.openscale.core.data.MeasurementTypeKey
 import com.health.openscale.core.model.MeasurementWithValues
 import com.health.openscale.testutil.Fixtures
@@ -75,6 +76,8 @@ class HomeViewModelTest {
 
         assertThat(result).isEqualTo(
             HomeUiState.Reading(
+                measurementId = 1,
+                measuredAt = Fixtures.ts(2026, 8, 30),
                 weightKg = 68.4f,
                 deltaKg = 0f,
                 fatPercent = 28.1f,
@@ -160,18 +163,71 @@ class HomeViewModelTest {
     }
 
     // -------------------------------------------------------------------------
-    // HomeDisplay.isSyncing
+    // HomeDisplay sync-wait
     // -------------------------------------------------------------------------
 
     @Test
-    fun `isSyncing is true only mid-handshake, in either direction`() {
-        assertThat(HomeDisplay.isSyncing(ConnectionStatus.CONNECTING)).isTrue()
-        assertThat(HomeDisplay.isSyncing(ConnectionStatus.DISCONNECTING)).isTrue()
+    fun `isBusy is true while connected — the scale is still sending records`() {
+        assertThat(HomeDisplay.isBusy(ConnectionStatus.CONNECTING, HomeDisplay.SyncWait())).isTrue()
+        assertThat(HomeDisplay.isBusy(ConnectionStatus.CONNECTED, HomeDisplay.SyncWait())).isTrue()
+        assertThat(HomeDisplay.isBusy(ConnectionStatus.DISCONNECTING, HomeDisplay.SyncWait())).isTrue()
+        assertThat(HomeDisplay.isBusy(ConnectionStatus.DISCONNECTED, HomeDisplay.SyncWait())).isFalse()
+        assertThat(HomeDisplay.isBusy(ConnectionStatus.FAILED, HomeDisplay.SyncWait())).isFalse()
+    }
 
-        assertThat(HomeDisplay.isSyncing(ConnectionStatus.NONE)).isFalse()
-        assertThat(HomeDisplay.isSyncing(ConnectionStatus.DISCONNECTED)).isFalse()
-        assertThat(HomeDisplay.isSyncing(ConnectionStatus.CONNECTED)).isFalse()
-        assertThat(HomeDisplay.isSyncing(ConnectionStatus.FAILED)).isFalse()
-        assertThat(HomeDisplay.isSyncing(ConnectionStatus.BROADCAST_LISTENING)).isFalse()
+    @Test
+    fun `advanceSyncWait arms on CONNECTING and stays busy until a newer timestamp arrives`() {
+        var wait = HomeDisplay.SyncWait()
+        wait = HomeDisplay.advanceSyncWait(wait, ConnectionStatus.CONNECTING, newestTimestamp = 100L)
+        assertThat(wait.awaiting).isTrue()
+        assertThat(HomeDisplay.isBusy(ConnectionStatus.CONNECTED, wait)).isTrue()
+
+        wait = HomeDisplay.advanceSyncWait(wait, ConnectionStatus.CONNECTED, newestTimestamp = 100L)
+        assertThat(wait.awaiting).isTrue()
+
+        wait = HomeDisplay.advanceSyncWait(wait, ConnectionStatus.CONNECTED, newestTimestamp = 200L)
+        assertThat(wait.awaiting).isFalse()
+        assertThat(HomeDisplay.isBusy(ConnectionStatus.DISCONNECTED, wait)).isFalse()
+    }
+
+    @Test
+    fun `advanceSyncWait clears on disconnect after a handshake with no new reading`() {
+        var wait = HomeDisplay.advanceSyncWait(HomeDisplay.SyncWait(), ConnectionStatus.CONNECTING, 100L)
+        wait = HomeDisplay.advanceSyncWait(wait, ConnectionStatus.DISCONNECTED, 100L)
+        assertThat(wait.awaiting).isFalse()
+    }
+
+    @Test
+    fun `advanceSyncWait does not arm on DISCONNECTED so a denied-permission tap cannot latch`() {
+        val wait = HomeDisplay.advanceSyncWait(HomeDisplay.SyncWait(), ConnectionStatus.DISCONNECTED, 100L)
+        assertThat(wait.awaiting).isFalse()
+        assertThat(HomeDisplay.isBusy(ConnectionStatus.DISCONNECTED, wait)).isFalse()
+    }
+
+    @Test
+    fun `ClientEditUiState applyTo writes name phone email birth date sex and height`() {
+        val user = Fixtures.user(id = 2, name = "Person 2", birthDate = 0L, heightCm = 170f)
+        val edited = ClientEditUiState.from(user).copy(
+            name = " Asha Verma ",
+            phone = "9811111111",
+            email = "asha@example.com",
+            birthDate = Fixtures.ts(1992, 1, 1),
+            gender = GenderType.FEMALE,
+            heightCm = "162",
+        ).applyTo(user)
+
+        assertThat(edited).isNotNull()
+        assertThat(edited!!.name).isEqualTo("Asha Verma")
+        assertThat(edited.phone).isEqualTo("9811111111")
+        assertThat(edited.email).isEqualTo("asha@example.com")
+        assertThat(edited.birthDate).isEqualTo(Fixtures.ts(1992, 1, 1))
+        assertThat(edited.heightCm).isEqualTo(162f)
+    }
+
+    @Test
+    fun `ClientEditUiState applyTo rejects a blank name or unparseable height`() {
+        val user = Fixtures.user(id = 2, name = "Person 2")
+        assertThat(ClientEditUiState.from(user).copy(name = "  ").applyTo(user)).isNull()
+        assertThat(ClientEditUiState.from(user).copy(heightCm = "tall").applyTo(user)).isNull()
     }
 }

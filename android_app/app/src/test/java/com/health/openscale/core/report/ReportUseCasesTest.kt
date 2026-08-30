@@ -153,8 +153,8 @@ class ReportUseCasesTest {
         val model = useCases.buildModel(client, measurementId).getOrThrow()
 
         assertThat(model.client.ageYears).isEqualTo(CLIENT_AGE_UNKNOWN)
-        val bodyFatRow = model.rows.single { it.label == "Body fat" }
-        val muscleRow = model.rows.single { it.label == "Skeletal muscle" }
+        val bodyFatRow = model.rows.single { it.label == "Body fat %" }
+        val muscleRow = model.rows.single { it.label == "Skeletal muscle %" }
         assertThat(bodyFatRow.status).isEqualTo("—")
         assertThat(muscleRow.status).isEqualTo("—")
     }
@@ -170,8 +170,8 @@ class ReportUseCasesTest {
         val model = useCases.buildModel(client, measurementId).getOrThrow()
 
         assertThat(model.client.ageYears).isNotEqualTo(CLIENT_AGE_UNKNOWN)
-        val bodyFatRow = model.rows.single { it.label == "Body fat" }
-        val muscleRow = model.rows.single { it.label == "Skeletal muscle" }
+        val bodyFatRow = model.rows.single { it.label == "Body fat %" }
+        val muscleRow = model.rows.single { it.label == "Skeletal muscle %" }
         assertThat(bodyFatRow.status).isNotEqualTo("—")
         assertThat(muscleRow.status).isNotEqualTo("—")
     }

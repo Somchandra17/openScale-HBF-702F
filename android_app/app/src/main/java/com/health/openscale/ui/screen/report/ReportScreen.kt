@@ -17,9 +17,7 @@
  */
 package com.health.openscale.ui.screen.report
 
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import com.health.openscale.core.report.ReportArtwork
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -121,40 +119,6 @@ fun ReportScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    val pdfLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/pdf"),
-        onResult = { uri: Uri? ->
-            val uid = selectedUserId
-            val mid = selectedMeasurementId
-            if (uri != null && uid != null && mid != null) {
-                coroutineScope.launch {
-                    viewModel.exportPdf(uid, mid, uri, context.contentResolver)
-                        .onSuccess {
-                            sharedViewModel.showSnackbar(messageResId = R.string.export_successful)
-                        }
-                        .onFailure { e ->
-                            sharedViewModel.showSnackbar(
-                                messageResId = R.string.export_error_generic,
-                                formatArgs = listOf(e.localizedMessage ?: "Unknown error"),
-                            )
-                        }
-                }
-            }
-        },
-    )
-
-    // CSV reuses the existing export path unchanged (SharedViewModel.performCsvExport, the same
-    // call DataManagementSettingsScreen drives) — the whole history, not just the picked row.
-    val csvLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("text/csv"),
-        onResult = { uri: Uri? ->
-            val uid = selectedUserId
-            if (uri != null && uid != null) {
-                sharedViewModel.performCsvExport(uid, uri, context.contentResolver)
-            }
-        },
-    )
-
     ReportContent(
         users = users,
         selectedId = selectedUserId ?: -1,
@@ -166,12 +130,45 @@ fun ReportScreen(
         previewFailed = previewState is ReportViewModel.PreviewState.Failed,
         previewLoading = previewState is ReportViewModel.PreviewState.Loading,
         onExportPdf = {
-            val fileName = (previewState as? ReportViewModel.PreviewState.Loaded)?.suggestedFileName
-            if (fileName != null) pdfLauncher.launch(fileName)
+            val uid = selectedUserId
+            val mid = selectedMeasurementId
+            if (uid != null && mid != null) {
+                coroutineScope.launch {
+                    val artwork = ReportArtwork.load(context.assets)
+                    viewModel.renderPdf(uid, mid, artwork)
+                        .onSuccess { (bytes, fileName) ->
+                            val uri = ReportShare.writeBytes(context, fileName, bytes)
+                            ReportShare.share(context, uri, "application/pdf")
+                        }
+                        .onFailure { e ->
+                            sharedViewModel.showSnackbar(
+                                messageResId = R.string.export_error_generic,
+                                formatArgs = listOf(e.localizedMessage ?: "Unknown error"),
+                            )
+                        }
+                }
+            }
         },
         onExportCsv = {
+            val uid = selectedUserId
             val userName = users.firstOrNull { it.id == selectedUserId }?.name.orEmpty()
-            csvLauncher.launch(ReportCsvNaming.suggestedFileName(userName))
+            if (uid != null) {
+                coroutineScope.launch {
+                    val fileName = ReportCsvNaming.suggestedFileName(userName)
+                    val uri = ReportShare.createEmpty(context, fileName)
+                    sharedViewModel.exportCsvToUri(uid, uri, context.contentResolver)
+                        .onSuccess { rows ->
+                            if (rows > 0) ReportShare.share(context, uri, "text/csv")
+                            else sharedViewModel.showSnackbar(messageResId = R.string.export_error_no_exportable_values)
+                        }
+                        .onFailure { e ->
+                            sharedViewModel.showSnackbar(
+                                messageResId = R.string.export_error_generic,
+                                formatArgs = listOf(e.localizedMessage ?: "Unknown error"),
+                            )
+                        }
+                }
+            }
         },
     )
 }

@@ -286,6 +286,31 @@ class SharedViewModel @Inject constructor(
         viewModelScope.launch { userFacade.updateUserGoal(goal) }
     }
 
+    fun updateUser(user: User) {
+        viewModelScope.launch {
+            try {
+                userFacade.updateUser(user).getOrThrow()
+                showSnackbar(
+                    messageResId = R.string.user_updated_successfully,
+                    formatArgs = listOf(user.name),
+                )
+            } catch (e: Exception) {
+                LogManager.e(TAG, "updateUser failed", e)
+                showSnackbar(
+                    messageResId = R.string.user_updated_error,
+                    formatArgs = listOf(user.name),
+                )
+            }
+        }
+    }
+
+    suspend fun exportCsvToUri(
+        userId: Int,
+        uri: Uri,
+        contentResolver: ContentResolver,
+        filterByMeasurementIds: List<Int>? = null,
+    ): Result<Int> = dataManagementFacade.exportUserToCsv(userId, uri, contentResolver, filterByMeasurementIds)
+
     fun deleteUserGoal(userId: Int, measurementTypeId: Int) {
         viewModelScope.launch { userFacade.deleteUserGoal(userId, measurementTypeId) }
     }

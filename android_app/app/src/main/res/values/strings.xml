@@ -133,6 +133,10 @@
     <!-- Home & History screens -->
     <string name="label_no_readings_yet">No readings yet</string>
     <string name="action_sync_scale">Sync scale</string>
+    <string name="home_action_edit_person">Edit person</string>
+    <string name="home_action_print_report">Print report</string>
+    <string name="home_edit_title">Edit person</string>
+    <string name="home_birth_date_not_set">Not set</string>
     <string name="home_label_body_fat">Body fat</string>
     <string name="home_label_muscle">Muscle</string>
     <string name="home_label_bmi">BMI</string>
@@ -140,8 +144,8 @@
 
     <!-- Report screen -->
     <string name="report_label_no_weighins">No weigh-ins yet</string>
-    <string name="report_action_export_pdf">Export PDF</string>
-    <string name="report_action_export_csv">Export CSV</string>
+    <string name="report_action_export_pdf">Share PDF</string>
+    <string name="report_action_export_csv">Share CSV</string>
     <string name="report_header_section_client">Client</string>
     <string name="report_header_section_coach">Coach</string>
     <string name="report_header_label_name">Name</string>

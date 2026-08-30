@@ -24,7 +24,7 @@ data class TextStyle(val size: Float, val colour: Int, val bold: Boolean = false
  * The drawing surface [PdfReportRenderer]'s layout logic ([PdfReportRenderer.draw]) draws onto.
  *
  * Deliberately free of any Android type. That is what lets the layout — column widths,
- * row order, the ellipsize fallback, the greyscale-only palette — be driven and asserted
+ * row order, the ellipsize fallback, the palette — be driven and asserted
  * against a plain JVM fake in tests, with no Robolectric involved.
  *
  * [android.graphics.pdf.PdfDocument] is Skia-backed with no shadow in this project's
@@ -38,4 +38,6 @@ interface ReportCanvas {
     fun drawRect(left: Float, top: Float, right: Float, bottom: Float, colour: Int)
     fun drawLine(startX: Float, startY: Float, stopX: Float, stopY: Float, colour: Int)
     fun measureText(text: String, style: TextStyle): Float
+    /** [key] is [ReportArtwork.LOGO] or [ReportArtwork.FOOTER]; size is already decided by the layout. */
+    fun drawImage(key: String, left: Float, top: Float, width: Float, height: Float)
 }

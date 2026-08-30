@@ -9,7 +9,7 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
@@ -17,6 +17,7 @@
  */
 package com.health.openscale.ui.screen.home
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,46 +28,64 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.health.openscale.R
+import com.health.openscale.core.data.GenderType
 import com.health.openscale.core.data.User
-import com.health.openscale.ui.screen.components.rememberBluetoothActionButton
+import com.health.openscale.core.report.ReportArtwork
 import com.health.openscale.ui.screen.components.UserSwitcherRow
+import com.health.openscale.ui.screen.components.rememberBluetoothActionButton
+import com.health.openscale.ui.screen.report.ReportShare
+import com.health.openscale.ui.screen.report.ReportViewModel
 import com.health.openscale.ui.screen.settings.BluetoothViewModel
 import com.health.openscale.ui.shared.SharedViewModel
+import kotlinx.coroutines.launch
+import java.text.DateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
-/**
- * The always-on landing screen: the selected client's latest reading, at a glance, plus the
- * one button that matters most in this app — sync the scale.
- *
- * Thin wrapper: collects [sharedViewModel] and [bluetoothViewModel] state, reduces it via
- * [HomeStateMapper]/[HomeDisplay] (HomeViewModel.kt), and hands already-decided state to
- * [HomeContent]. The Bluetooth connect flow is not reimplemented here — [bluetoothAction] is the
- * exact same [com.health.openscale.ui.shared.TopBarAction] built by
- * [rememberBluetoothActionButton] for the top bar icon elsewhere in the app, so tapping "Sync
- * scale" runs the identical permission/enable-Bluetooth/connect/assisted-weighing logic.
- */
 @Composable
 fun HomeScreen(
     navController: NavController,
     sharedViewModel: SharedViewModel,
     bluetoothViewModel: BluetoothViewModel,
+    reportViewModel: ReportViewModel = hiltViewModel(),
 ) {
     val users by sharedViewModel.allUsers.collectAsStateWithLifecycle()
     val selectedUserId by sharedViewModel.selectedUserId.collectAsStateWithLifecycle()
@@ -75,7 +94,18 @@ fun HomeScreen(
 
     val bluetoothAction = rememberBluetoothActionButton(bluetoothViewModel, sharedViewModel, navController)
     val latest = remember(measurements) { HomeStateMapper.toReading(measurements) }
-    val isSyncing = remember(connectionStatus) { HomeDisplay.isSyncing(connectionStatus) }
+
+    var syncWait by remember { mutableStateOf(HomeDisplay.SyncWait()) }
+    LaunchedEffect(connectionStatus, latest?.measuredAt) {
+        syncWait = HomeDisplay.advanceSyncWait(syncWait, connectionStatus, latest?.measuredAt)
+    }
+    val isSyncing = HomeDisplay.isBusy(connectionStatus, syncWait)
+
+    var editing by remember { mutableStateOf<ClientEditUiState?>(null) }
+    val selectedUser = users.firstOrNull { it.id == selectedUserId }
+
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         sharedViewModel.setTopBarTitle(R.string.route_title_home)
@@ -89,13 +119,46 @@ fun HomeScreen(
         latest = latest,
         onSync = bluetoothAction.onClick,
         isSyncing = isSyncing,
+        onEditPerson = { selectedUser?.let { editing = ClientEditUiState.from(it) } },
+        editEnabled = selectedUser != null,
+        onPrint = {
+            val uid = selectedUserId
+            val mid = latest?.measurementId
+            if (uid != null && mid != null) {
+                coroutineScope.launch {
+                    val artwork = ReportArtwork.load(context.assets)
+                    reportViewModel.renderPdf(uid, mid, artwork)
+                        .onSuccess { (bytes, fileName) ->
+                            val uri = ReportShare.writeBytes(context, fileName, bytes)
+                            ReportShare.share(context, uri, "application/pdf")
+                        }
+                        .onFailure { e ->
+                            sharedViewModel.showSnackbar(
+                                messageResId = R.string.export_error_generic,
+                                formatArgs = listOf(e.localizedMessage ?: "Unknown error"),
+                            )
+                        }
+                }
+            }
+        },
+        printEnabled = latest != null,
     )
+
+    editing?.let { state ->
+        ClientEditDialog(
+            state = state,
+            onChange = { editing = it },
+            onDismiss = { editing = null },
+            onSave = {
+                selectedUser?.let { user ->
+                    state.applyTo(user)?.let { sharedViewModel.updateUser(it) }
+                }
+                editing = null
+            },
+        )
+    }
 }
 
-/**
- * Stateless: renders exactly the state it is handed and forwards taps. No ordering, no
- * defaulting, no formatting decisions live here — those are all in HomeViewModel.kt.
- */
 @Composable
 fun HomeContent(
     users: List<User>,
@@ -104,10 +167,22 @@ fun HomeContent(
     latest: HomeUiState.Reading?,
     onSync: () -> Unit,
     isSyncing: Boolean,
+    onEditPerson: () -> Unit = {},
+    editEnabled: Boolean = true,
+    onPrint: () -> Unit = {},
+    printEnabled: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
         UserSwitcherRow(users = users, selectedId = selectedId, onSelect = onSelect)
+
+        TextButton(
+            onClick = onEditPerson,
+            enabled = editEnabled,
+            modifier = Modifier.align(Alignment.End).padding(horizontal = 8.dp),
+        ) {
+            Text(stringResource(R.string.home_action_edit_person))
+        }
 
         if (latest == null) {
             Box(
@@ -122,7 +197,7 @@ fun HomeContent(
             }
         } else {
             Column(
-                modifier = Modifier.weight(1f).padding(16.dp),
+                modifier = Modifier.weight(1f).padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Column {
@@ -170,6 +245,14 @@ fun HomeContent(
             }
         }
 
+        OutlinedButton(
+            onClick = onPrint,
+            enabled = printEnabled,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        ) {
+            Text(stringResource(R.string.home_action_print_report))
+        }
+
         Button(
             onClick = onSync,
             enabled = !isSyncing,
@@ -188,7 +271,6 @@ fun HomeContent(
     }
 }
 
-/** One cell of Home's 2x2 fat/muscle/BMI/visceral-fat grid. */
 @Composable
 private fun StatCell(label: String, value: String, modifier: Modifier = Modifier) {
     Card(modifier = modifier, elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)) {
@@ -202,6 +284,141 @@ private fun StatCell(label: String, value: String, modifier: Modifier = Modifier
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(text = value, style = MaterialTheme.typography.titleLarge)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ClientEditDialog(
+    state: ClientEditUiState,
+    onChange: (ClientEditUiState) -> Unit,
+    onDismiss: () -> Unit,
+    onSave: () -> Unit,
+) {
+    var genderExpanded by remember { mutableStateOf(false) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = state.birthDate.takeIf { it > 0L },
+    )
+    val dateFormatter = remember {
+        DateFormat.getDateInstance(DateFormat.DEFAULT, Locale.getDefault()).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        }
+    }
+    val dateLabel = if (state.birthDate == 0L) {
+        stringResource(R.string.home_birth_date_not_set)
+    } else {
+        dateFormatter.format(Date(state.birthDate))
+    }
+
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { onChange(state.copy(birthDate = it)) }
+                    showDatePicker = false
+                }) { Text(stringResource(R.string.dialog_ok)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text(stringResource(R.string.cancel_button))
+                }
+            },
+        ) { DatePicker(state = datePickerState) }
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card {
+            Column(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.home_edit_title),
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                OutlinedTextField(
+                    value = state.name,
+                    onValueChange = { onChange(state.copy(name = it)) },
+                    label = { Text(stringResource(R.string.user_detail_label_name)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+                OutlinedTextField(
+                    value = state.phone,
+                    onValueChange = { onChange(state.copy(phone = it)) },
+                    label = { Text(stringResource(R.string.report_header_label_phone)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+                OutlinedTextField(
+                    value = state.email,
+                    onValueChange = { onChange(state.copy(email = it)) },
+                    label = { Text(stringResource(R.string.report_header_label_email)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+                Box {
+                    OutlinedTextField(
+                        value = dateLabel,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text(stringResource(R.string.user_detail_label_birth_date)) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Box(Modifier.matchParentSize().clickable { showDatePicker = true })
+                }
+                ExposedDropdownMenuBox(
+                    expanded = genderExpanded,
+                    onExpandedChange = { genderExpanded = !genderExpanded },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    OutlinedTextField(
+                        value = state.gender.getDisplayName(LocalContext.current),
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text(stringResource(R.string.user_detail_label_gender)) },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = genderExpanded) },
+                        modifier = Modifier.menuAnchor(type = ExposedDropdownMenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
+                    )
+                    ExposedDropdownMenu(
+                        expanded = genderExpanded,
+                        onDismissRequest = { genderExpanded = false },
+                    ) {
+                        GenderType.entries.forEach { option ->
+                            DropdownMenuItem(
+                                text = { Text(option.getDisplayName(LocalContext.current)) },
+                                onClick = {
+                                    onChange(state.copy(gender = option))
+                                    genderExpanded = false
+                                },
+                            )
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    value = state.heightCm,
+                    onValueChange = { onChange(state.copy(heightCm = it)) },
+                    label = { Text(stringResource(R.string.user_detail_label_height)) },
+                    suffix = { Text("cm") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel_button)) }
+                    Button(onClick = onSave, enabled = state.isValid()) {
+                        Text("Save")
+                    }
+                }
+            }
         }
     }
 }
