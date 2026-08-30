@@ -1,0 +1,320 @@
+/*
+ * openScale
+ * Copyright (C) 2026 openScale contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+package com.health.openscale.ui.screen.report
+
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Card
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavController
+import com.health.openscale.R
+import com.health.openscale.core.data.User
+import com.health.openscale.ui.screen.components.UserSwitcherRow
+import com.health.openscale.ui.screen.history.HistoryRow
+import com.health.openscale.ui.screen.history.HistoryStateMapper
+import com.health.openscale.ui.shared.SharedViewModel
+import kotlinx.coroutines.launch
+
+/**
+ * Where the client handout gets made: pick a client (the always-visible [UserSwitcherRow]),
+ * pick one of their weigh-ins (defaulting to the most recent), review the header fields that
+ * will print on the sheet, then export. PDF exports exactly the selected weigh-in; CSV exports
+ * that client's entire history — see [ReportContent]'s doc for why the two deliberately differ
+ * in scope.
+ *
+ * Thin wrapper: collects [sharedViewModel] state, derives [rows] via the same
+ * [HistoryStateMapper] History uses (so "the most recent weigh-in" means the same thing on both
+ * screens), tracks which row is picked, and drives [ReportViewModel] for everything that needs
+ * [com.health.openscale.core.report.ReportUseCases]. Hands already-decided state to
+ * [ReportContent], which decides nothing itself.
+ */
+@Composable
+fun ReportScreen(
+    navController: NavController,
+    sharedViewModel: SharedViewModel,
+    viewModel: ReportViewModel = hiltViewModel(),
+) {
+    val users by sharedViewModel.allUsers.collectAsStateWithLifecycle()
+    val selectedUserId by sharedViewModel.selectedUserId.collectAsStateWithLifecycle()
+    val measurements by sharedViewModel.measurementsOfSelectedUser.collectAsStateWithLifecycle()
+    val previewState by viewModel.previewState.collectAsStateWithLifecycle()
+
+    val rows = remember(measurements) { HistoryStateMapper.toRows(measurements) }
+
+    // Screen-local pick, not shared state: which weigh-in is being reported on is only relevant
+    // here. Reset (to the newest again) whenever the client switches.
+    var selectedMeasurementId by remember(selectedUserId) {
+        mutableStateOf(ReportSelection.defaultMeasurementId(rows))
+    }
+
+    // If the row set changes under the current pick (e.g. that weigh-in was deleted elsewhere,
+    // or this is the first composition after a sync) and the pick no longer exists in it, fall
+    // back to the newest again.
+    LaunchedEffect(rows) {
+        if (rows.none { it.measurementId == selectedMeasurementId }) {
+            selectedMeasurementId = ReportSelection.defaultMeasurementId(rows)
+        }
+    }
+
+    LaunchedEffect(selectedUserId, selectedMeasurementId) {
+        val uid = selectedUserId
+        viewModel.onSelectionChanged(uid ?: -1, if (uid == null) null else selectedMeasurementId)
+    }
+
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    val pdfLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/pdf"),
+        onResult = { uri: Uri? ->
+            val uid = selectedUserId
+            val mid = selectedMeasurementId
+            if (uri != null && uid != null && mid != null) {
+                coroutineScope.launch {
+                    viewModel.exportPdf(uid, mid, uri, context.contentResolver)
+                        .onSuccess {
+                            sharedViewModel.showSnackbar(messageResId = R.string.export_successful)
+                        }
+                        .onFailure { e ->
+                            sharedViewModel.showSnackbar(
+                                messageResId = R.string.export_error_generic,
+                                formatArgs = listOf(e.localizedMessage ?: "Unknown error"),
+                            )
+                        }
+                }
+            }
+        },
+    )
+
+    // CSV reuses the existing export path unchanged (SharedViewModel.performCsvExport, the same
+    // call DataManagementSettingsScreen drives) — the whole history, not just the picked row.
+    val csvLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/csv"),
+        onResult = { uri: Uri? ->
+            val uid = selectedUserId
+            if (uri != null && uid != null) {
+                sharedViewModel.performCsvExport(uid, uri, context.contentResolver)
+            }
+        },
+    )
+
+    ReportContent(
+        users = users,
+        selectedId = selectedUserId ?: -1,
+        onSelect = { sharedViewModel.selectUser(it) },
+        rows = rows,
+        selectedMeasurementId = selectedMeasurementId,
+        onPick = { selectedMeasurementId = it },
+        preview = (previewState as? ReportViewModel.PreviewState.Loaded)?.preview,
+        previewFailed = previewState is ReportViewModel.PreviewState.Failed,
+        onExportPdf = {
+            val fileName = (previewState as? ReportViewModel.PreviewState.Loaded)?.suggestedFileName
+            if (fileName != null) pdfLauncher.launch(fileName)
+        },
+        onExportCsv = {
+            val userName = users.firstOrNull { it.id == selectedUserId }?.name.orEmpty()
+            csvLauncher.launch(ReportCsvNaming.suggestedFileName(userName))
+        },
+    )
+}
+
+/**
+ * Stateless: renders exactly the state it is handed and forwards taps. No ordering, no
+ * defaulting, no formatting decisions live here — those are all in ReportViewModel.kt
+ * ([ReportSelection], [ReportPreviewMapper], [ReportCsvNaming]).
+ *
+ * The two export actions deliberately differ in scope: [onExportPdf] exports only
+ * [selectedMeasurementId] (a client handout, one sheet per visit); [onExportCsv] exports that
+ * client's *entire* history (a spreadsheet dump), independent of which row is picked. Both are
+ * disabled together — [ReportSelection.isExportEnabled] — since both still need a client with at
+ * least one weigh-in to make sense of "this client's report".
+ */
+@Composable
+fun ReportContent(
+    users: List<User>,
+    selectedId: Int,
+    onSelect: (Int) -> Unit,
+    rows: List<HistoryRow>,
+    selectedMeasurementId: Int?,
+    onPick: (Int) -> Unit,
+    preview: ReportHeaderPreview?,
+    onExportPdf: () -> Unit,
+    onExportCsv: () -> Unit,
+    modifier: Modifier = Modifier,
+    previewFailed: Boolean = false,
+) {
+    val exportEnabled = ReportSelection.isExportEnabled(selectedMeasurementId)
+
+    Column(modifier = modifier.fillMaxSize()) {
+        UserSwitcherRow(users = users, selectedId = selectedId, onSelect = onSelect)
+
+        if (rows.isEmpty()) {
+            Box(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = stringResource(R.string.report_label_no_weighins),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                items(rows, key = { it.measurementId }) { row ->
+                    WeighInPickerRow(
+                        row = row,
+                        isSelected = row.measurementId == selectedMeasurementId,
+                        onClick = { onPick(row.measurementId) },
+                    )
+                }
+            }
+        }
+
+        if (preview != null) {
+            ReportHeaderPreviewCard(preview)
+        } else if (previewFailed) {
+            Text(
+                text = stringResource(R.string.report_header_load_error),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Button(
+                onClick = onExportPdf,
+                enabled = exportEnabled,
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(stringResource(R.string.report_action_export_pdf))
+            }
+            OutlinedButton(
+                onClick = onExportCsv,
+                enabled = exportEnabled,
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(stringResource(R.string.report_action_export_csv))
+            }
+        }
+    }
+}
+
+@Composable
+private fun WeighInPickerRow(row: HistoryRow, isSelected: Boolean, onClick: () -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                RadioButton(selected = isSelected, onClick = onClick)
+                Text(text = row.dateLabel, style = MaterialTheme.typography.bodyMedium)
+            }
+            Text(text = row.weightLabel, style = MaterialTheme.typography.bodyLarge)
+        }
+        HorizontalDivider()
+    }
+}
+
+/**
+ * The read-only header fields that will print on the sheet — client and coach contact blocks,
+ * plus device and measurement date — so a missing phone number or an unset club name is
+ * something the coach notices here, not on the printed page.
+ */
+@Composable
+private fun ReportHeaderPreviewCard(preview: ReportHeaderPreview, modifier: Modifier = Modifier) {
+    Card(modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.report_header_section_client),
+                style = MaterialTheme.typography.titleSmall,
+            )
+            PreviewLine(stringResource(R.string.report_header_label_name), preview.clientName)
+            PreviewLine(stringResource(R.string.report_header_label_phone), preview.clientPhone)
+            PreviewLine(stringResource(R.string.report_header_label_email), preview.clientEmail)
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
+
+            Text(
+                text = stringResource(R.string.report_header_section_coach),
+                style = MaterialTheme.typography.titleSmall,
+            )
+            PreviewLine(stringResource(R.string.report_header_label_name), preview.coachName)
+            PreviewLine(stringResource(R.string.report_header_label_title), preview.coachTitle)
+            PreviewLine(stringResource(R.string.report_header_label_club), preview.coachClub)
+            PreviewLine(stringResource(R.string.report_header_label_phone), preview.coachPhone)
+            PreviewLine(stringResource(R.string.report_header_label_email), preview.coachEmail)
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
+
+            PreviewLine(stringResource(R.string.report_header_label_device), preview.deviceName)
+            PreviewLine(stringResource(R.string.report_header_label_measured_at), preview.measuredAtLabel)
+        }
+    }
+}
+
+@Composable
+private fun PreviewLine(label: String, value: String, modifier: Modifier = Modifier) {
+    Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(text = value, style = MaterialTheme.typography.bodyMedium)
+    }
+}

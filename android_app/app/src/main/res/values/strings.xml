@@ -137,6 +137,21 @@
     <string name="home_label_bmi">BMI</string>
     <string name="home_label_visceral_fat">Visceral fat</string>
 
+    <!-- Report screen -->
+    <string name="report_label_no_weighins">No weigh-ins yet</string>
+    <string name="report_action_export_pdf">Export PDF</string>
+    <string name="report_action_export_csv">Export CSV</string>
+    <string name="report_header_section_client">Client</string>
+    <string name="report_header_section_coach">Coach</string>
+    <string name="report_header_label_name">Name</string>
+    <string name="report_header_label_title">Title</string>
+    <string name="report_header_label_club">Club</string>
+    <string name="report_header_label_phone">Phone</string>
+    <string name="report_header_label_email">Email</string>
+    <string name="report_header_label_device">Device</string>
+    <string name="report_header_label_measured_at">Measured</string>
+    <string name="report_header_load_error">Couldn\'t load the report preview.</string>
+
     <!-- Measurement Input & Validation Toasts -->
     <string name="toast_invalid_number_format">Invalid number for %1$s: \'%2$s\'</string>
     <string name="toast_invalid_integer_format">Invalid integer for %1$s: \'%2$s\'</string>
