@@ -119,6 +119,26 @@ class PdfReportRendererTest {
     }
 
     @Test
+    fun `a blank club name still draws the logo and does not promote the coach name to the header`() {
+        val canvas = recordDraw(model().copy(coach = model().coach.copy(club = "")))
+        assertThat(canvas.images.any { it.key == ReportArtwork.LOGO }).isTrue()
+        assertThat(canvas.texts.none { it.text.isNotBlank() && it.style.size == PdfReportRenderer.CLUB_SIZE }).isTrue()
+        val coach = canvas.texts.single { it.text == "Reena Chandra" }
+        assertThat(coach.style.size).isEqualTo(PdfReportRenderer.COACH_NAME_SIZE)
+        assertThat(coach.style.bold).isFalse()
+    }
+
+    @Test
+    fun `measurement table and remarks stay above the footer`() {
+        val canvas = recordDraw()
+        val footer = canvas.images.single { it.key == ReportArtwork.FOOTER }
+        val remarks = canvas.texts.single { it.text == "Remarks" }
+        val lastRule = canvas.calls.filterIsInstance<DrawCall.Line>().maxBy { it.startY }
+        assertThat(remarks.y).isLessThan(footer.top)
+        assertThat(lastRule.startY).isLessThan(footer.top)
+    }
+
+    @Test
     fun `club name is the masthead, coach name is not`() {
         val canvas = recordDraw()
         val club = canvas.texts.single { it.text == "Fit Studio" }

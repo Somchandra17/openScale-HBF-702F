@@ -257,15 +257,19 @@ object PdfReportRenderer {
         artwork.forEach { (key, bytes) ->
             BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.let { bitmaps[key] = it }
         }
-        val doc = PdfDocument()
-        val page = doc.startPage(PdfDocument.PageInfo.Builder(PAGE_W, PAGE_H, 1).create())
-        draw(model, AndroidReportCanvas(page.canvas, bitmaps))
-        doc.finishPage(page)
+        try {
+            val doc = PdfDocument()
+            val page = doc.startPage(PdfDocument.PageInfo.Builder(PAGE_W, PAGE_H, 1).create())
+            draw(model, AndroidReportCanvas(page.canvas, bitmaps))
+            doc.finishPage(page)
 
-        val out = ByteArrayOutputStream()
-        doc.writeTo(out)
-        doc.close()
-        return out.toByteArray()
+            val out = ByteArrayOutputStream()
+            doc.writeTo(out)
+            doc.close()
+            return out.toByteArray()
+        } finally {
+            bitmaps.values.forEach { it.recycle() }
+        }
     }
 
     /** Maps [ReportCanvas] calls onto a real Android [Canvas]/[Paint]. See [render]. */

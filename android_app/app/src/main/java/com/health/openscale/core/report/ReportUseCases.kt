@@ -102,7 +102,9 @@ class ReportUseCases @Inject constructor(
         artwork: Map<String, ByteArray> = emptyMap(),
     ): Result<Pair<ByteArray, String>> = runCatching {
         val model = buildModel(userId, measurementId).getOrThrow()
-        PdfReportRenderer.render(model, artwork) to suggestedFileName(model)
+        withContext(Dispatchers.IO) {
+            PdfReportRenderer.render(model, artwork) to suggestedFileName(model)
+        }
     }
 
     /**

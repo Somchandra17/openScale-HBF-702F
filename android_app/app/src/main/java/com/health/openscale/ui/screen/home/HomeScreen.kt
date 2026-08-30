@@ -106,6 +106,7 @@ fun HomeScreen(
 
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    var sharing by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         sharedViewModel.setTopBarTitle(R.string.route_title_home)
@@ -124,24 +125,29 @@ fun HomeScreen(
         onPrint = {
             val uid = selectedUserId
             val mid = latest?.measurementId
-            if (uid != null && mid != null) {
+            if (uid != null && mid != null && !sharing) {
+                sharing = true
                 coroutineScope.launch {
-                    val artwork = ReportArtwork.load(context.assets)
-                    reportViewModel.renderPdf(uid, mid, artwork)
-                        .onSuccess { (bytes, fileName) ->
-                            val uri = ReportShare.writeBytes(context, fileName, bytes)
-                            ReportShare.share(context, uri, "application/pdf")
-                        }
-                        .onFailure { e ->
-                            sharedViewModel.showSnackbar(
-                                messageResId = R.string.export_error_generic,
-                                formatArgs = listOf(e.localizedMessage ?: "Unknown error"),
-                            )
-                        }
+                    try {
+                        val artwork = ReportArtwork.load(context.assets)
+                        reportViewModel.renderPdf(uid, mid, artwork)
+                            .onSuccess { (bytes, fileName) ->
+                                val uri = ReportShare.writeBytes(context, fileName, bytes)
+                                ReportShare.share(context, uri, "application/pdf")
+                            }
+                            .onFailure { e ->
+                                sharedViewModel.showSnackbar(
+                                    messageResId = R.string.export_error_generic,
+                                    formatArgs = listOf(e.localizedMessage ?: "Unknown error"),
+                                )
+                            }
+                    } finally {
+                        sharing = false
+                    }
                 }
             }
         },
-        printEnabled = latest != null,
+        printEnabled = latest != null && !sharing,
     )
 
     editing?.let { state ->

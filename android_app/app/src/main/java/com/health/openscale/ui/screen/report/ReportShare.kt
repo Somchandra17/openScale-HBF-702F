@@ -17,6 +17,7 @@
  */
 package com.health.openscale.ui.screen.report
 
+import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
@@ -58,6 +59,13 @@ object ReportShare {
             clipData = ClipData.newRawUri("", uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        context.startActivity(Intent.createChooser(send, null))
+        val chooser = Intent.createChooser(send, null).apply {
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        try {
+            context.startActivity(chooser)
+        } catch (e: ActivityNotFoundException) {
+            throw IllegalStateException("No app available to share this file", e)
+        }
     }
 }
