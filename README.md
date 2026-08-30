@@ -62,7 +62,7 @@ Weight, body fat %, skeletal muscle %, visceral fat, BMI, resting metabolism (BM
 This project remains **GPL v3**, same as openScale. Copyright of the original work: olie.xdev. See `LICENSE`.
 
     Copyright (C) 2025  olie.xdev <olie.xdeveloper@googlemail.com>
-    Copyright (C) 2026  Chandra Fitness Club fork contributors
+    Copyright (C) 2026  0xs0m somm.tf 
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
