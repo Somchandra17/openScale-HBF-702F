@@ -90,6 +90,13 @@ fun ReportScreen(
 
     val rows = remember(measurements) { HistoryStateMapper.toRows(measurements) }
 
+    // Same top-bar contract as Home and History: this tab owns the title, and carries no
+    // actions of its own.
+    LaunchedEffect(Unit) {
+        sharedViewModel.setTopBarTitle(R.string.route_title_report)
+        sharedViewModel.setTopBarActions(emptyList())
+    }
+
     // Screen-local pick, not shared state: which weigh-in is being reported on is only relevant
     // here. Reset (to the newest again) whenever the client switches.
     var selectedMeasurementId by remember(selectedUserId) {
