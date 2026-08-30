@@ -129,6 +129,14 @@
     <string name="no_measurements_message">Add your first measurement to start tracking your progress.</string>
     <string name="no_active_values_for_measurement">No active measurement values for this entry.</string>
 
+    <!-- Home & History screens -->
+    <string name="label_no_readings_yet">No readings yet</string>
+    <string name="action_sync_scale">Sync scale</string>
+    <string name="home_label_body_fat">Body fat</string>
+    <string name="home_label_muscle">Muscle</string>
+    <string name="home_label_bmi">BMI</string>
+    <string name="home_label_visceral_fat">Visceral fat</string>
+
     <!-- Measurement Input & Validation Toasts -->
     <string name="toast_invalid_number_format">Invalid number for %1$s: \'%2$s\'</string>
     <string name="toast_invalid_integer_format">Invalid integer for %1$s: \'%2$s\'</string>

@@ -680,6 +680,21 @@ class SharedViewModel @Inject constructor(
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /**
+     * All measurements (newest → oldest) for the selected user.
+     *
+     * Used by screens that need more than just the latest entry — Home's delta-vs-previous,
+     * History's full list and sparkline — where [lastMeasurementOfSelectedUser] (which drops
+     * everything but the first entry) is not enough.
+     */
+    val measurementsOfSelectedUser: StateFlow<List<MeasurementWithValues>> =
+        selectedUserId
+            .flatMapLatest { uid ->
+                if (uid == null) flowOf(emptyList())
+                else measurementFacade.getMeasurementsForUser(uid)
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /**
      * The values to pre-fill an empty add-measurement form with — produced by the same carry-over a
      * Bluetooth sync runs, so a manual entry starts out exactly where a scale sync would.
      */
