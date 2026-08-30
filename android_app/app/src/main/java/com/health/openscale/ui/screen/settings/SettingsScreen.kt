@@ -26,6 +26,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ShowChart
+import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
@@ -86,6 +87,7 @@ fun SettingsScreen(
     val chartSettingsLabel = stringResource(R.string.settings_item_chart)
     val dataManagementLabel = stringResource(R.string.settings_item_data_management)
     val aboutLabel = stringResource(R.string.settings_item_about)
+    val coachProfileLabel = stringResource(R.string.settings_item_coach_profile)
 
     val items = listOf(
         SettingsItem(
@@ -129,6 +131,12 @@ fun SettingsScreen(
             icon = Icons.Default.Info,
             route = Routes.ABOUT_SETTINGS,
             contentDescription = aboutLabel
+        ),
+        SettingsItem(
+            label = coachProfileLabel,
+            icon = Icons.Default.Badge,
+            route = Routes.COACH_PROFILE,
+            contentDescription = coachProfileLabel
         )
     )
 

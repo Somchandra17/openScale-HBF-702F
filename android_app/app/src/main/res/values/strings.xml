@@ -612,6 +612,7 @@
     <string name="settings_item_chart">Chart</string>
     <string name="settings_item_data_management">Data Management</string>
     <string name="settings_item_about">About</string>
+    <string name="settings_item_coach_profile">Coach profile</string>
 
     <!-- General Settings Screen -->
     <string name="settings_general_title">General Settings</string>

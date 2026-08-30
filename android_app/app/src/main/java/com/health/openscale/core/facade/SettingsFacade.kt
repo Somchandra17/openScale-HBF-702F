@@ -304,6 +304,12 @@ interface SettingsFacade {
     suspend fun coachPhone(): String
     suspend fun coachEmail(): String
 
+    suspend fun setCoachName(name: String)
+    suspend fun setCoachTitle(title: String)
+    suspend fun setCoachClub(club: String)
+    suspend fun setCoachPhone(phone: String)
+    suspend fun setCoachEmail(email: String)
+
     /**
      * Developer mode for the saved scale: every connection is routed to the diagnostic handler,
      * which dumps the GATT tree and logs notifications but never stores a measurement.
@@ -664,6 +670,26 @@ class SettingsFacadeImpl @Inject constructor(
 
     override suspend fun coachEmail(): String =
         observeSetting(SettingsPreferenceKeys.COACH_EMAIL.name, "").first()
+
+    override suspend fun setCoachName(name: String) {
+        saveSetting(SettingsPreferenceKeys.COACH_NAME.name, name)
+    }
+
+    override suspend fun setCoachTitle(title: String) {
+        saveSetting(SettingsPreferenceKeys.COACH_TITLE.name, title)
+    }
+
+    override suspend fun setCoachClub(club: String) {
+        saveSetting(SettingsPreferenceKeys.COACH_CLUB.name, club)
+    }
+
+    override suspend fun setCoachPhone(phone: String) {
+        saveSetting(SettingsPreferenceKeys.COACH_PHONE.name, phone)
+    }
+
+    override suspend fun setCoachEmail(email: String) {
+        saveSetting(SettingsPreferenceKeys.COACH_EMAIL.name, email)
+    }
 
     override val developerModeEnabled: Flow<Boolean> = observeSetting(
         SettingsPreferenceKeys.SAVED_BLUETOOTH_DEVELOPER_MODE.name,
