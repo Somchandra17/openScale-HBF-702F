@@ -20,6 +20,40 @@ This fork: https://github.com/Somchandra17/openScale-HBF-702F
 
 Install the APK from [Releases](https://github.com/Somchandra17/openScale-HBF-702F/releases), or build it locally (`./build-apk.sh`). Package id stays `com.health.openscale` so a debug build can sit beside a stock openScale install.
 
+# Screenshots
+
+Phone screens are shown at a fixed 180px width so they stay phone-sized on GitHub. The PDF is a document, so it is a little wider.
+
+<table>
+  <tr>
+    <td align="center" valign="top" width="33%">
+      <a href="docs/screens/coach/home.png">
+        <img src="docs/screens/coach/home.png" width="180" alt="Home — latest reading, Edit person, Print report, Sync scale"/>
+      </a><br/>
+      <sub>Home</sub>
+    </td>
+    <td align="center" valign="top" width="33%">
+      <a href="docs/screens/coach/history.png">
+        <img src="docs/screens/coach/history.png" width="180" alt="History — weigh-ins for the selected person"/>
+      </a><br/>
+      <sub>History</sub>
+    </td>
+    <td align="center" valign="top" width="33%">
+      <a href="docs/screens/coach/bluetooth.png">
+        <img src="docs/screens/coach/bluetooth.png" width="180" alt="Settings — paired Omron HBF-702T"/>
+      </a><br/>
+      <sub>Scale</sub>
+    </td>
+  </tr>
+</table>
+
+<p align="center">
+  <a href="docs/screens/coach/pdf-report.png">
+    <img src="docs/screens/coach/pdf-report.png" width="280" alt="A4 client PDF — Chandra Fitness Club logo, ranges, summary, remarks"/>
+  </a><br/>
+  <sub>Client PDF (A4)</sub>
+</p>
+
 # What the scale sends
 
 Weight, body fat %, skeletal muscle %, visceral fat, BMI, resting metabolism (BMR), body age, and the weigh-in time. Date of birth, sex and height are **not** in the Bluetooth record — they live in the client profile (Home → Edit person) so the Status column and PDF ranges can be filled in.
