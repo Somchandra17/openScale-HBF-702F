@@ -110,6 +110,13 @@ object ReportRowBuilder {
         }
 
     private fun bodyAgeRow(spec: Spec, value: Float, client: ClientBlock): ReportRow {
+        // Mirrors PdfReportRenderer's own CLIENT_AGE_UNKNOWN guard: the reading is a real,
+        // machine-reported value and still prints, but with no actual age on file there is
+        // nothing to compare it against, so status/normalRange dash out rather than guessing
+        // (or printing the literal sentinel). See finding B4.
+        if (client.ageYears == CLIENT_AGE_UNKNOWN) {
+            return ReportRow(spec.label, spec.format(value), DASH, DASH)
+        }
         val delta = value.toInt() - client.ageYears
         val status = if (delta >= 0) "+$delta yrs" else "$delta yrs"
         return ReportRow(spec.label, spec.format(value), status, "${client.ageYears} (actual age)")

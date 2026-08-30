@@ -150,4 +150,23 @@ class ReportModelTest {
         val muscle = rows.single { it.label == "Skeletal muscle" }
         assertThat(muscle.status).isEqualTo("High") // 34yo female normal range tops out at 30.3
     }
+
+    @Test
+    fun `an unset profile still shows the measured body age, but dashes status and normal range`() {
+        // The HBF-702T reports Body age directly — it's a real machine value, so it must
+        // still print, even though there's no actual age on file to compare it against.
+        val row = ReportRowBuilder.build(mapOf("BODY_AGE" to 41f), clientWithUnsetProfile)
+            .single { it.label == "Body age" }
+        assertThat(row.reading).isEqualTo("41 years")
+        assertThat(row.status).isEqualTo("—")
+        assertThat(row.normalRange).isEqualTo("—")
+    }
+
+    @Test
+    fun `a completed profile still shows the body age delta, proving the unset-profile fallback is scoped`() {
+        val row = ReportRowBuilder.build(mapOf("BODY_AGE" to 41f), client).single { it.label == "Body age" }
+        assertThat(row.reading).isEqualTo("41 years")
+        assertThat(row.status).isEqualTo("+7 yrs")
+        assertThat(row.normalRange).isEqualTo("34 (actual age)")
+    }
 }

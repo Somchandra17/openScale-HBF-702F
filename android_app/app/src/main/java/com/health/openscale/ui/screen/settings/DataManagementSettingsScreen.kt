@@ -762,6 +762,9 @@ fun UserSelectionDialog(
                     val age = remember(user.birthDate) {
                         CalculationUtils.ageOn(System.currentTimeMillis(), user.birthDate)
                     }
+                    // birthDate == 0L means "never set" — see the same guard and rationale in
+                    // UserSettingsScreen / CLIENT_AGE_UNKNOWN (finding B4).
+                    val ageKnown = user.birthDate != 0L
 
                     val (icon, tint) = when (user.gender) {
                         GenderType.MALE ->
@@ -783,8 +786,17 @@ fun UserSelectionDialog(
                         },
                         supportingContent = {
                             val genderName = user.gender.getDisplayName(context)
+                            val detailsText = if (ageKnown) {
+                                resources.getString(R.string.user_settings_item_details_conditional, age, genderName)
+                            } else {
+                                resources.getString(
+                                    R.string.user_settings_item_details_age_unset,
+                                    resources.getString(R.string.not_available),
+                                    genderName
+                                )
+                            }
                             Text(
-                                text = resources.getString(R.string.user_settings_item_details_conditional, age, genderName),
+                                text = detailsText,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

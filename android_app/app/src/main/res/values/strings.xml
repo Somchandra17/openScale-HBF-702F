@@ -97,6 +97,10 @@
     <string name="user_detail_error_invalid_data">Please enter valid data</string>
     <string name="height_value_cm">%.1f cm</string>
     <string name="user_settings_item_details_conditional">Age: %1$d, Gender: %2$s</string>
+    <!-- Same wording as user_settings_item_details_conditional, but %1$s (not %1$d): the age
+         slot takes not_available instead of a number when birthDate is unset (0L) — see
+         CLIENT_AGE_UNKNOWN / finding B4. Used wherever the user list shows a computed age. -->
+    <string name="user_settings_item_details_age_unset">Age: %1$s, Gender: %2$s</string>
     <string name="user_settings_content_description_edit">Edit user</string>
     <string name="user_settings_content_description_delete">Delete user</string>
     <string name="user_settings_content_description_add_user">Add new user</string>

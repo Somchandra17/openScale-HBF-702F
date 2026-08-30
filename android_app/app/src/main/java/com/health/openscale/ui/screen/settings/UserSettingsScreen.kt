@@ -82,6 +82,10 @@ fun UserSettingsScreen(
             val age = remember(user.birthDate) {
                 CalculationUtils.ageOn(System.currentTimeMillis(), user.birthDate)
             }
+            // birthDate == 0L means "never set" (see User.birthDate's own sentinel and
+            // core.report.CLIENT_AGE_UNKNOWN): CalculationUtils.ageOn would otherwise report a
+            // real-looking ~56 for a freshly seeded, untouched profile. See finding B4.
+            val ageKnown = user.birthDate != 0L
 
             ListItem(
                 leadingContent = {
@@ -94,12 +98,21 @@ fun UserSettingsScreen(
                 },
                 headlineContent = { Text(user.name) },
                 supportingContent = {
+                    val genderName = user.gender.getDisplayName(LocalContext.current)
                     Text(
-                        stringResource(
-                            id = R.string.user_settings_item_details_conditional,
-                            age,
-                            user.gender.getDisplayName(LocalContext.current)
-                        )
+                        if (ageKnown) {
+                            stringResource(
+                                id = R.string.user_settings_item_details_conditional,
+                                age,
+                                genderName
+                            )
+                        } else {
+                            stringResource(
+                                id = R.string.user_settings_item_details_age_unset,
+                                stringResource(id = R.string.not_available),
+                                genderName
+                            )
+                        }
                     )
                 }
                 ,
