@@ -19,7 +19,6 @@ package com.health.openscale.ui.screen.home
 
 import com.google.common.truth.Truth.assertThat
 import com.health.openscale.core.data.ConnectionStatus
-import com.health.openscale.core.data.GenderType
 import com.health.openscale.core.data.MeasurementTypeKey
 import com.health.openscale.core.model.MeasurementWithValues
 import com.health.openscale.testutil.Fixtures
@@ -205,29 +204,26 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `ClientEditUiState applyTo writes name phone email birth date sex and height`() {
+    fun `ClientEditUiState applyTo writes name phone and email and leaves profile fields alone`() {
         val user = Fixtures.user(id = 2, name = "Person 2", birthDate = 0L, heightCm = 170f)
         val edited = ClientEditUiState.from(user).copy(
             name = " Asha Verma ",
             phone = "9811111111",
             email = "asha@example.com",
-            birthDate = Fixtures.ts(1992, 1, 1),
-            gender = GenderType.FEMALE,
-            heightCm = "162",
         ).applyTo(user)
 
         assertThat(edited).isNotNull()
         assertThat(edited!!.name).isEqualTo("Asha Verma")
         assertThat(edited.phone).isEqualTo("9811111111")
         assertThat(edited.email).isEqualTo("asha@example.com")
-        assertThat(edited.birthDate).isEqualTo(Fixtures.ts(1992, 1, 1))
-        assertThat(edited.heightCm).isEqualTo(162f)
+        assertThat(edited.birthDate).isEqualTo(0L)
+        assertThat(edited.heightCm).isEqualTo(170f)
+        assertThat(edited.gender).isEqualTo(user.gender)
     }
 
     @Test
-    fun `ClientEditUiState applyTo rejects a blank name or unparseable height`() {
+    fun `ClientEditUiState applyTo rejects a blank name`() {
         val user = Fixtures.user(id = 2, name = "Person 2")
         assertThat(ClientEditUiState.from(user).copy(name = "  ").applyTo(user)).isNull()
-        assertThat(ClientEditUiState.from(user).copy(heightCm = "tall").applyTo(user)).isNull()
     }
 }

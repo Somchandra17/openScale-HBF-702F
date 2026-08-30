@@ -17,7 +17,6 @@
  */
 package com.health.openscale.ui.screen.home
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,26 +27,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -65,7 +54,6 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.health.openscale.R
-import com.health.openscale.core.data.GenderType
 import com.health.openscale.core.data.User
 import com.health.openscale.core.report.ReportArtwork
 import com.health.openscale.ui.screen.components.UserSwitcherRow
@@ -75,10 +63,6 @@ import com.health.openscale.ui.screen.report.ReportViewModel
 import com.health.openscale.ui.screen.settings.BluetoothViewModel
 import com.health.openscale.ui.shared.SharedViewModel
 import kotlinx.coroutines.launch
-import java.text.DateFormat
-import java.util.Date
-import java.util.Locale
-import java.util.TimeZone
 
 @Composable
 fun HomeScreen(
@@ -294,7 +278,6 @@ private fun StatCell(label: String, value: String, modifier: Modifier = Modifier
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ClientEditDialog(
     state: ClientEditUiState,
@@ -302,45 +285,10 @@ private fun ClientEditDialog(
     onDismiss: () -> Unit,
     onSave: () -> Unit,
 ) {
-    var genderExpanded by remember { mutableStateOf(false) }
-    var showDatePicker by remember { mutableStateOf(false) }
-    val datePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = state.birthDate.takeIf { it > 0L },
-    )
-    val dateFormatter = remember {
-        DateFormat.getDateInstance(DateFormat.DEFAULT, Locale.getDefault()).apply {
-            timeZone = TimeZone.getTimeZone("UTC")
-        }
-    }
-    val dateLabel = if (state.birthDate == 0L) {
-        stringResource(R.string.home_birth_date_not_set)
-    } else {
-        dateFormatter.format(Date(state.birthDate))
-    }
-
-    if (showDatePicker) {
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    datePickerState.selectedDateMillis?.let { onChange(state.copy(birthDate = it)) }
-                    showDatePicker = false
-                }) { Text(stringResource(R.string.dialog_ok)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) {
-                    Text(stringResource(R.string.cancel_button))
-                }
-            },
-        ) { DatePicker(state = datePickerState) }
-    }
-
     Dialog(onDismissRequest = onDismiss) {
         Card {
             Column(
-                modifier = Modifier
-                    .padding(16.dp)
-                    .verticalScroll(rememberScrollState()),
+                modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
@@ -365,52 +313,6 @@ private fun ClientEditDialog(
                     value = state.email,
                     onValueChange = { onChange(state.copy(email = it)) },
                     label = { Text(stringResource(R.string.report_header_label_email)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                )
-                Box {
-                    OutlinedTextField(
-                        value = dateLabel,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text(stringResource(R.string.user_detail_label_birth_date)) },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Box(Modifier.matchParentSize().clickable { showDatePicker = true })
-                }
-                ExposedDropdownMenuBox(
-                    expanded = genderExpanded,
-                    onExpandedChange = { genderExpanded = !genderExpanded },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    OutlinedTextField(
-                        value = state.gender.getDisplayName(LocalContext.current),
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text(stringResource(R.string.user_detail_label_gender)) },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = genderExpanded) },
-                        modifier = Modifier.menuAnchor(type = ExposedDropdownMenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
-                    )
-                    ExposedDropdownMenu(
-                        expanded = genderExpanded,
-                        onDismissRequest = { genderExpanded = false },
-                    ) {
-                        GenderType.entries.forEach { option ->
-                            DropdownMenuItem(
-                                text = { Text(option.getDisplayName(LocalContext.current)) },
-                                onClick = {
-                                    onChange(state.copy(gender = option))
-                                    genderExpanded = false
-                                },
-                            )
-                        }
-                    }
-                }
-                OutlinedTextField(
-                    value = state.heightCm,
-                    onValueChange = { onChange(state.copy(heightCm = it)) },
-                    label = { Text(stringResource(R.string.user_detail_label_height)) },
-                    suffix = { Text("cm") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                 )
