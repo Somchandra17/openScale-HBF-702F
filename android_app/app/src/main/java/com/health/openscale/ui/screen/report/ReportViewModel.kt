@@ -21,6 +21,7 @@ import android.content.ContentResolver
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.health.openscale.core.data.GenderType
 import com.health.openscale.core.report.ReportModel
 import com.health.openscale.core.report.ReportUseCases
 import com.health.openscale.ui.screen.history.HistoryRow
@@ -85,6 +86,13 @@ data class ReportHeaderPreview(
     val clientName: String,
     val clientPhone: String,
     val clientEmail: String,
+    // Raw, unformatted — mirroring ReportModel.client — so the age-unknown sentinel and any
+    // "does this look right" judgement stay the UI's call, not baked into a formatted string
+    // here. These three drive every banded row on the sheet, so the coach must be able to spot
+    // a missing or wrong one here, before printing. See finding B4.
+    val ageYears: Int,
+    val gender: GenderType,
+    val heightCm: Float,
     val coachName: String,
     val coachTitle: String,
     val coachClub: String,
@@ -107,6 +115,9 @@ object ReportPreviewMapper {
         clientName = model.client.name.ifBlank { REPORT_HEADER_MISSING_PLACEHOLDER },
         clientPhone = model.client.phone.ifBlank { REPORT_HEADER_MISSING_PLACEHOLDER },
         clientEmail = model.client.email.ifBlank { REPORT_HEADER_MISSING_PLACEHOLDER },
+        ageYears = model.client.ageYears,
+        gender = model.client.gender,
+        heightCm = model.client.heightCm,
         coachName = model.coach.name.ifBlank { REPORT_HEADER_MISSING_PLACEHOLDER },
         coachTitle = model.coach.title.ifBlank { REPORT_HEADER_MISSING_PLACEHOLDER },
         coachClub = model.coach.club.ifBlank { REPORT_HEADER_MISSING_PLACEHOLDER },

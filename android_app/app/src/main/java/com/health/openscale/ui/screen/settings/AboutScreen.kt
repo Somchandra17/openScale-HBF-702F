@@ -99,6 +99,9 @@ fun AboutScreen(
 
     LaunchedEffect(Unit) {
         sharedViewModel.setTopBarTitle(context.getString(R.string.about_screen_title))
+        // See finding B3: _topBarActions is sticky global state, so this screen must clear
+        // whatever the previously visited screen left behind rather than assume it is empty.
+        sharedViewModel.setTopBarActions(emptyList())
     }
 
     val scrollState = rememberScrollState()

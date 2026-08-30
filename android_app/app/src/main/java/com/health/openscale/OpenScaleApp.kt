@@ -38,8 +38,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import java.util.Calendar
-import java.util.TimeZone
 import javax.inject.Inject
 
 /**
@@ -98,14 +96,18 @@ fun getDefaultMeasurementTypes(): List<MeasurementType> {
  * ("Person 1" .. "Person 4") intended to be renamed by the coach before first use.
  */
 fun getDefaultUsers(): List<User> {
-    val defaultBirthDate = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
-        add(Calendar.YEAR, -18)
-    }.timeInMillis
+    // 0L is an explicit "not set" sentinel, not a real birth date. A seeded value of exactly
+    // "18 years ago" used to sit right at ReferenceRanges.MIN_ADULT_AGE, so an untouched profile
+    // always banded — confidently, and wrongly, against adult male 18-39 cut-offs. The report
+    // path (ReportUseCases.buildModel) checks for this sentinel and reports the client's age as
+    // unknown rather than computing a real (and equally wrong) chronological age from it; see
+    // finding B4.
+    val unsetBirthDate = 0L
 
     return (1..4).map { index ->
         User(
             name = "Person $index",
-            birthDate = defaultBirthDate,
+            birthDate = unsetBirthDate,
             gender = GenderType.MALE,
             heightCm = 170f,
             activityLevel = ActivityLevel.SEDENTARY,

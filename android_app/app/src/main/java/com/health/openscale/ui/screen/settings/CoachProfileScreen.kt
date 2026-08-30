@@ -182,10 +182,17 @@ class CoachProfileViewModel @Inject constructor(
         _uiState.value = newState
     }
 
-    /** Persists whatever is CURRENTLY in [uiState] (the live edit), not what was loaded at start. */
-    fun save() {
+    /**
+     * Persists whatever is CURRENTLY in [uiState] (the live edit), not what was loaded at start.
+     * [onSaved] runs only after the write completes, never before — the screen uses it to show a
+     * confirmation snackbar and pop back, so it must not fire on a save that has not actually
+     * landed. `suspend` (not a plain lambda) so a caller inside this same coroutine, such as a
+     * test asserting what was actually persisted, can await it directly. See finding B2.
+     */
+    fun save(onSaved: suspend () -> Unit = {}) {
         viewModelScope.launch {
             _uiState.value.saveTo(settingsFacade)
+            onSaved()
         }
     }
 }
@@ -211,6 +218,15 @@ fun CoachProfileScreen(
     CoachProfileContent(
         state = state,
         onChange = viewModel::onChange,
-        onSave = viewModel::save,
+        onSave = {
+            // Save was previously silent: no snackbar, no navigation, no visible state change
+            // at all, and the system back gesture would then discard the edit unconfirmed.
+            // These five fields print on every client sheet's masthead, so the coach must be
+            // able to tell the save actually landed. See finding B2.
+            viewModel.save {
+                sharedViewModel.showSnackbar(messageResId = R.string.coach_profile_saved_snackbar)
+                navController.popBackStack()
+            }
+        },
     )
 }

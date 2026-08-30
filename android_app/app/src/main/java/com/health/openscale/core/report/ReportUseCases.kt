@@ -42,6 +42,13 @@ class ReportUseCases @Inject constructor(
             ?: error("No user with id=$userId")
         val mwv = repository.getMeasurementWithValuesById(measurementId).first()
             ?: error("No measurement with id=$measurementId")
+        // User and measurement are fetched independently and can legitimately disagree during a
+        // client switch (selectedUserId already moved to B while `rows` still belongs to A) —
+        // without this check the model would silently carry client B's identity fields next to
+        // client A's readings, the worst failure a printed handout can have. See finding D4.
+        check(mwv.measurement.userId == userId) {
+            "Measurement $measurementId belongs to user ${mwv.measurement.userId}, not requested user $userId"
+        }
 
         val values: Map<String, Float> = mwv.values
             .mapNotNull { v -> v.value.floatValue?.let { v.type.key.name to it } }
@@ -51,7 +58,17 @@ class ReportUseCases @Inject constructor(
             name = user.name,
             phone = user.phone,
             email = user.email,
-            ageYears = CalculationUtils.ageOn(mwv.measurement.timestamp, user.birthDate),
+            // birthDate == 0L is the "not set" sentinel a freshly seeded profile carries (see
+            // OpenScaleApp.getDefaultUsers). Computing a real ageOn() against epoch would yield
+            // a plausible-looking but entirely made-up age (decades old) that then confidently
+            // (and wrongly) bands against ReferenceRanges' cut-offs. CLIENT_AGE_UNKNOWN is below
+            // ReferenceRanges.MIN_ADULT_AGE, so every age/sex-dependent row falls back to
+            // Band.NONE instead. See finding B4.
+            ageYears = if (user.birthDate == 0L) {
+                CLIENT_AGE_UNKNOWN
+            } else {
+                CalculationUtils.ageOn(mwv.measurement.timestamp, user.birthDate)
+            },
             gender = user.gender,
             heightCm = user.heightCm,
         )

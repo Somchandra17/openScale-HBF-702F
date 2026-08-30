@@ -21,6 +21,18 @@ import com.health.openscale.core.data.GenderType
 import com.health.openscale.core.data.MeasurementTypeKey
 import java.time.LocalDateTime
 
+/**
+ * Sentinel [ClientBlock.ageYears] for "this client's birth date was never set" (an untouched,
+ * freshly seeded profile — see [User.birthDate]'s own 0L "not set" sentinel in
+ * `OpenScaleApp.getDefaultUsers`). Deliberately a value [ReferenceRanges] already refuses to
+ * band on its own terms (below `MIN_ADULT_AGE`), and unmistakably out of range for a real age
+ * (never negative) so it can't be confused with a rounding artefact — rather than reusing 0,
+ * which a literal newborn could someday have. Consumers that print age directly (the PDF header,
+ * the header preview card) must check for this value themselves rather than printing it as-is.
+ * See finding B4.
+ */
+const val CLIENT_AGE_UNKNOWN = -1
+
 data class CoachBlock(
     val name: String,
     val title: String,

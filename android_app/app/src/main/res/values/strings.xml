@@ -147,6 +147,9 @@
     <string name="report_header_label_email">Email</string>
     <string name="report_header_label_device">Device</string>
     <string name="report_header_label_measured_at">Measured</string>
+    <string name="report_header_label_age">Age</string>
+    <string name="report_header_label_gender">Sex</string>
+    <string name="report_header_label_height">Height</string>
     <string name="report_header_load_error">Couldn\'t load the report preview.</string>
 
     <!-- Measurement Input & Validation Toasts -->
@@ -633,6 +636,7 @@
     <string name="settings_item_data_management">Data Management</string>
     <string name="settings_item_about">About</string>
     <string name="settings_item_coach_profile">Coach profile</string>
+    <string name="coach_profile_saved_snackbar">Coach profile saved.</string>
 
     <!-- General Settings Screen -->
     <string name="settings_general_title">General Settings</string>

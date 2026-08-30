@@ -67,6 +67,10 @@ fun UserSettingsScreen(
 
     LaunchedEffect(Unit, usersTitle) { // Add usersTitle to keys to re-run if it could change (e.g. language change)
         sharedViewModel.setTopBarTitle(usersTitle) // "Users"
+        // _topBarActions is global sticky state: without this, a Save action left behind by
+        // UserDetailScreen (set while editing a user) survives the pop-back and stays in the top
+        // bar here, wired to that disposed screen's stale updateUser() call. See finding B3.
+        sharedViewModel.setTopBarActions(emptyList())
     }
 
     LazyColumn(

@@ -167,6 +167,7 @@ fun AppNavHost(
             }
             composable(Routes.DATA_MANAGEMENT_SETTINGS) {
                 DataManagementSettingsScreen(
+                    sharedViewModel = sharedViewModel,
                     settingsViewModel = settingsViewModel
                 )
             }

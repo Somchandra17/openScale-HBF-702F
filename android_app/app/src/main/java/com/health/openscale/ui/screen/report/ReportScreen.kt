@@ -58,6 +58,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.health.openscale.R
 import com.health.openscale.core.data.User
+import com.health.openscale.core.report.CLIENT_AGE_UNKNOWN
 import com.health.openscale.ui.screen.components.UserSwitcherRow
 import com.health.openscale.ui.screen.history.HistoryRow
 import com.health.openscale.ui.screen.history.HistoryStateMapper
@@ -314,6 +315,26 @@ private fun ReportHeaderPreviewCard(preview: ReportHeaderPreview, modifier: Modi
             PreviewLine(stringResource(R.string.report_header_label_name), preview.clientName)
             PreviewLine(stringResource(R.string.report_header_label_phone), preview.clientPhone)
             PreviewLine(stringResource(R.string.report_header_label_email), preview.clientEmail)
+            // Age, sex and height drive every banded row on the printed sheet, so the coach
+            // must be able to spot a missing or wrong one here — before printing, not after.
+            // An unset birth date shows as a placeholder rather than a fabricated age. See
+            // finding B4.
+            PreviewLine(
+                stringResource(R.string.report_header_label_age),
+                if (preview.ageYears == CLIENT_AGE_UNKNOWN) {
+                    REPORT_HEADER_MISSING_PLACEHOLDER
+                } else {
+                    "${preview.ageYears}"
+                },
+            )
+            PreviewLine(
+                stringResource(R.string.report_header_label_gender),
+                preview.gender.getDisplayName(LocalContext.current),
+            )
+            PreviewLine(
+                stringResource(R.string.report_header_label_height),
+                String.format(java.util.Locale.US, "%.0f cm", preview.heightCm),
+            )
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
 

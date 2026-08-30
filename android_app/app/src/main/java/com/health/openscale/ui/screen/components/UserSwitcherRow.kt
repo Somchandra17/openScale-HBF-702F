@@ -18,10 +18,12 @@
 package com.health.openscale.ui.screen.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -70,18 +72,38 @@ fun UserSwitcherRow(
     modifier: Modifier = Modifier,
 ) {
     val entries = userSwitcherEntries(users, selectedId)
+    // Four buttons share this row on a 360 dp phone, so every dp of chrome the default
+    // ButtonDefaults.ContentPadding (24 dp each side) reserves comes straight out of the label's
+    // budget — enough to cut a name down to its first 4-5 glyphs, exactly where two of the four
+    // seeded names ("Person 1".."Person 4") differ. A tight, explicit padding plus a smaller
+    // type scale buys back that space; this is the control switching client, so its label must
+    // stay legible above all else. See finding B1 in the pre-ship review.
+    val tightPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
     Row(
         modifier = modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         entries.forEach { entry ->
             val label = @Composable {
-                Text(entry.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    entry.label,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.labelSmall,
+                )
             }
             if (entry.isSelected) {
-                Button(onClick = { onSelect(entry.id) }, modifier = Modifier.weight(1f)) { label() }
+                Button(
+                    onClick = { onSelect(entry.id) },
+                    modifier = Modifier.weight(1f),
+                    contentPadding = tightPadding,
+                ) { label() }
             } else {
-                OutlinedButton(onClick = { onSelect(entry.id) }, modifier = Modifier.weight(1f)) { label() }
+                OutlinedButton(
+                    onClick = { onSelect(entry.id) },
+                    modifier = Modifier.weight(1f),
+                    contentPadding = tightPadding,
+                ) { label() }
             }
         }
     }

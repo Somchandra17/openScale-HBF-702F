@@ -96,6 +96,7 @@ import java.util.Locale
 import androidx.core.net.toUri
 import com.health.openscale.core.data.GenderType
 import com.health.openscale.core.utils.CalculationUtils
+import com.health.openscale.ui.shared.SharedViewModel
 
 
 /**
@@ -139,6 +140,7 @@ sealed class DataManagementSettingListItem {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DataManagementSettingsScreen(
+    sharedViewModel: SharedViewModel,
     settingsViewModel: SettingsViewModel
 ) {
     val users by settingsViewModel.allUsers.collectAsState()
@@ -164,6 +166,14 @@ fun DataManagementSettingsScreen(
     val context = LocalContext.current
     val resources = LocalResources.current
     val coroutineScope = rememberCoroutineScope()
+
+    // This screen previously set neither the top-bar title nor its actions, so it silently
+    // inherited whatever a prior screen last set — including a stale "Save" action left behind
+    // by UserDetailScreen (_topBarActions is sticky global state). See finding B3.
+    LaunchedEffect(Unit) {
+        sharedViewModel.setTopBarTitle(resources.getString(R.string.settings_item_data_management))
+        sharedViewModel.setTopBarActions(emptyList())
+    }
 
     // --- Automatic Backup Settings from ViewModel ---
     val autoBackupGloballyEnabled by settingsViewModel.autoBackupEnabled.collectAsState()

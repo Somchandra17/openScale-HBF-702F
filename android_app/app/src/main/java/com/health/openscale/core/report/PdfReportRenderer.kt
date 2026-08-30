@@ -97,10 +97,12 @@ object PdfReportRenderer {
         val labelStyle = TextStyle(9f, INK_SOFT)
         val valueStyle = TextStyle(10f, INK)
         val sexLabel = m.client.gender.name.lowercase().replaceFirstChar { it.uppercase() }
+        val ageKnown = m.client.ageYears != CLIENT_AGE_UNKNOWN
+        val ageLabel = if (ageKnown) "${m.client.ageYears}" else "—"
         val infoRows = listOf(
             InfoRow("Client", m.client.name, "Date", m.measuredAt.format(DATE_FMT)),
             InfoRow("Phone", m.client.phone, "Time", m.measuredAt.format(TIME_FMT)),
-            InfoRow("Email", m.client.email, "Age", "${m.client.ageYears} / $sexLabel"),
+            InfoRow("Email", m.client.email, "Age", "$ageLabel / $sexLabel"),
             InfoRow("", "", "Height", String.format(L, "%.0f cm", m.client.heightCm)),
         )
         val leftValueMaxWidth = col2 - MARGIN - 60f
@@ -152,8 +154,16 @@ object PdfReportRenderer {
         // -- Footnotes ------------------------------------------------------------
         y += 8f
         val noteStyle = TextStyle(8f, INK_SOFT)
-        val sex = m.client.gender.name.lowercase()
-        canvas.drawText("Ranges shown are for a ${m.client.ageYears}-year-old $sex.", MARGIN, y, noteStyle)
+        // An unset birth date must not make this footnote claim a basis ("18-year-old male")
+        // the sheet does not actually have — the very verdicts above it are dashed out for the
+        // same reason. See finding B4.
+        val ageSexNote = if (ageKnown) {
+            val sex = m.client.gender.name.lowercase()
+            "Ranges shown are for a ${m.client.ageYears}-year-old $sex."
+        } else {
+            "Client age not on file — age- and sex-based ranges are not shown."
+        }
+        canvas.drawText(ageSexNote, MARGIN, y, noteStyle)
         y += 11f
         canvas.drawText("Measured on ${m.deviceName}. Not a medical diagnosis.", MARGIN, y, noteStyle)
 
