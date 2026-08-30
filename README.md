@@ -2,7 +2,9 @@
 
 **This is a fork of [oliexdev/openScale](https://github.com/oliexdev/openScale).** It is **not** the upstream general-purpose scale app.
 
-This fork is modified for one machine — the **Omron HBF-702T / HBF-702F** body composition scale — and for one practice: **Chandra Fitness Club** (Reena Chandra, Weight Loss Coach). It syncs the four people on the scale, shows the latest reading, and prints a client-facing **A4 PDF** with the club name, brand logo, and footer artwork.
+Som Chandra built this for his mummy, **Reena Chandra**, so she can run **Chandra Fitness Club** without the stock openScale clutter.
+
+This fork is modified for one machine — the **Omron HBF-702T / HBF-702F** body composition scale — and for that practice. It syncs the four people on the scale, shows the latest reading, and prints a client-facing **A4 PDF** with the club name, brand logo, and footer artwork.
 
 Upstream openScale: https://github.com/oliexdev/openScale  
 This fork: https://github.com/Somchandra17/openScale-HBF-702F
@@ -16,7 +18,7 @@ This fork: https://github.com/Somchandra17/openScale-HBF-702F
 - Home / History / Report only. Print or share PDF and CSV from the phone (WhatsApp, Drive, Files, …).
 - PDF masthead is **Chandra Fitness Club**, with the club logo top-left. Coach name, phone and email sit under it. Remarks stay at the bottom for handwritten notes.
 
-Install the debug APK from a release or build it locally (`./build-apk.sh`). Package id stays `com.health.openscale` so it can sit beside a stock openScale install if you use the debug build.
+Install the APK from [Releases](https://github.com/Somchandra17/openScale-HBF-702F/releases), or build it locally (`./build-apk.sh`). Package id stays `com.health.openscale` so a debug build can sit beside a stock openScale install.
 
 # What the scale sends
 
