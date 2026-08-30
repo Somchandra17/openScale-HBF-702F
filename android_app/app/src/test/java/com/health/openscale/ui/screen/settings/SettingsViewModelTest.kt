@@ -105,18 +105,6 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun deleteUser_removesFromDatabase() = runBlocking {
-        val id = vm.addUser(user("Alice")).toInt()
-        val stored = repo.getAllUsers().first().first { it.id == id }
-
-        // deleteUser is fire-and-forget (runs on viewModelScope); await the DB reflecting the delete.
-        vm.deleteUser(stored, reseatSelection = false)
-
-        withTimeout(5_000) { repo.getAllUsers().first { users -> users.none { it.id == id } } }
-        assertThat(repo.getAllUsers().first().any { it.id == id }).isFalse()
-    }
-
-    @Test
     fun createUserWithGoals_persistsUserAndGoals() = runBlocking {
         repo.insertAllMeasurementTypes(getDefaultMeasurementTypes())
         val typeId = repo.getAllMeasurementTypes().first().first().id

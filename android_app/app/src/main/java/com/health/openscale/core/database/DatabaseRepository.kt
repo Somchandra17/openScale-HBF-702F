@@ -75,6 +75,16 @@ class DatabaseRepository @Inject constructor(
         return userDao.insert(user)
     }
 
+    /**
+     * Inserts [users] as a single atomic transaction (see [UserDao.insertAll]): either every user
+     * lands, or none does. Used for fixed-user seeding, where a partial insert would leave the
+     * user table permanently non-empty-but-short of four.
+     */
+    suspend fun insertUsers(users: List<User>) {
+        LogManager.d(TAG, "Inserting ${users.size} users atomically")
+        userDao.insertAll(users)
+    }
+
     suspend fun updateUser(user: User) {
         LogManager.d(TAG, "Updating user with id: ${user.id}")
         userDao.update(user)

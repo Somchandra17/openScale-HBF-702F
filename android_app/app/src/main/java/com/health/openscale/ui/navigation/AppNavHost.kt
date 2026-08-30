@@ -159,7 +159,6 @@ fun AppNavHost(
             composable(Routes.USER_SETTINGS) {
                 UserSettingsScreen(
                     sharedViewModel = sharedViewModel,
-                    settingsViewModel = settingsViewModel,
                     onEditUser = { userId ->
                         navController.navigate(Routes.userDetail(userId))
                     }

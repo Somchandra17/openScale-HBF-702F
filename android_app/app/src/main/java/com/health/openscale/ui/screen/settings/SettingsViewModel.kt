@@ -142,19 +142,6 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    /** Fire-and-forget delete on [viewModelScope] so it completes even if the screen is left. */
-    fun deleteUser(user: User, reseatSelection: Boolean = true) {
-        viewModelScope.launch {
-            try {
-                userFacade.deleteUser(user, reseatSelection).getOrThrow()
-                showSnackbar(R.string.user_deleted_successfully, listOf(user.name))
-            } catch (e: Exception) {
-                LogManager.e(TAG, "deleteUser failed", e)
-                showSnackbar(R.string.user_deleted_error, listOf(user.name))
-            }
-        }
-    }
-
     /**
      * Creates [user] together with its [goals] and selects the new user — all on [viewModelScope],
      * so the operation completes even if the edit screen navigates away immediately. Errors are

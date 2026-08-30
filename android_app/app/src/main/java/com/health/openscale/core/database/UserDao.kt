@@ -21,6 +21,7 @@ import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import com.health.openscale.core.data.User
 import kotlinx.coroutines.flow.Flow
@@ -29,6 +30,18 @@ import kotlinx.coroutines.flow.Flow
 interface UserDao {
     @Insert
     suspend fun insert(user: User): Long
+
+    /**
+     * Inserts [users] as a single atomic transaction: if any insert in the batch fails (e.g. a
+     * constraint violation), every insert made so far in this call rolls back too, rather than
+     * leaving a partial batch committed. Used for fixed-user seeding, where a partial insert
+     * would leave the table permanently non-empty-but-short of four (see
+     * [com.health.openscale.OpenScaleApp.seedFixedUsersIfEmpty]).
+     */
+    @Transaction
+    suspend fun insertAll(users: List<User>) {
+        users.forEach { insert(it) }
+    }
 
     @Update
     suspend fun update(user: User)

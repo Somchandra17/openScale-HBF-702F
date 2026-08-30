@@ -51,14 +51,12 @@ import com.health.openscale.ui.shared.SharedViewModel
  * here. It observes the list of users from [SharedViewModel].
  *
  * @param sharedViewModel The ViewModel shared across different screens, used for top bar configuration and accessing the user list.
- * @param settingsViewModel The ViewModel responsible for user-related settings operations.
  * @param onEditUser Callback invoked when the user taps the edit button for a user, receiving that user's ID.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UserSettingsScreen(
     sharedViewModel: SharedViewModel,
-    settingsViewModel: SettingsViewModel,
     onEditUser: (userId: Int?) -> Unit
 ) {
     val users by sharedViewModel.allUsers.collectAsState()

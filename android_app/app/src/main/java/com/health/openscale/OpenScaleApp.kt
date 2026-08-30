@@ -178,12 +178,17 @@ class OpenScaleApp : Application(), Configuration.Provider {
      * switch for measurement-type seeding and can be reset by a full database restore, whereas
      * the app's four-fixed-user invariant should hold regardless. Checking table emptiness on
      * every start keeps that invariant self-healing without ever re-inserting once users exist.
+     *
+     * The insert itself is atomic ([DatabaseRepository.insertUsers]): if it inserted one at a
+     * time and failed partway through, the table would end up non-empty-but-short of four, and
+     * since there is no add-user path in Settings, every later start would see `isEmpty() ==
+     * false` and never retry — a coach permanently stuck below four clients with no way back.
      */
     private suspend fun seedFixedUsersIfEmpty() {
         val existingUsers = databaseRepository.getAllUsers().first()
         if (existingUsers.isEmpty()) {
             LogManager.i(TAG, "No users found. Seeding the four fixed placeholder users.")
-            getDefaultUsers().forEach { databaseRepository.insertUser(it) }
+            databaseRepository.insertUsers(getDefaultUsers())
         } else {
             LogManager.d(TAG, "Users already exist (${existingUsers.size}). Skipping user seeding.")
         }
