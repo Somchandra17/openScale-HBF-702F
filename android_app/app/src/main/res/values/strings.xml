@@ -40,13 +40,10 @@
     <string name="no_entries_found">No entries available.</string>
 
     <!-- Route & Screen Titles -->
-    <string name="route_title_overview">Overview</string>
-    <string name="route_title_graph">Charts</string>
-    <string name="route_title_table">Table</string>
-    <string name="route_title_statistics">Statistics</string>
-    <string name="route_title_insights">Insights</string>
+    <string name="route_title_home">Home</string>
+    <string name="route_title_history">History</string>
+    <string name="route_title_report">Report</string>
     <string name="route_title_settings">Settings</string>
-    <string name="route_title_table_drilldown">Details</string>
     <string name="calendar_week_abbrev">CW</string>
     <string name="title_new_measurement">New Measurement</string>
     <string name="title_edit_measurement">Edit Measurement</string>

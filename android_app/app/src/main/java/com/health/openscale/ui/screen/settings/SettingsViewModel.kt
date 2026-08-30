@@ -143,23 +143,6 @@ class SettingsViewModel @Inject constructor(
     }
 
     /**
-     * Creates [user] together with its [goals] and selects the new user — all on [viewModelScope],
-     * so the operation completes even if the edit screen navigates away immediately. Errors are
-     * reported by [addUser] via snackbar.
-     */
-    fun createUserWithGoals(user: User, goals: List<UserGoals>) {
-        viewModelScope.launch {
-            val newId = addUser(user)
-            if (newId > 0) {
-                val uid = newId.toInt()
-                goals.forEach { userFacade.insertUserGoal(it.copy(userId = uid)) }
-                userFacade.setSelectedUserId(uid)
-                showSnackbar(R.string.user_added_successfully, listOf(user.name))
-            }
-        }
-    }
-
-    /**
      * Updates [user] and reconciles its goals (delete removed, insert new, update changed value) on
      * [viewModelScope]. [updateUser] reports success/failure via snackbar.
      */

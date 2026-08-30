@@ -35,6 +35,7 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -75,6 +76,11 @@ fun HomeScreen(
     val bluetoothAction = rememberBluetoothActionButton(bluetoothViewModel, sharedViewModel, navController)
     val latest = remember(measurements) { HomeStateMapper.toReading(measurements) }
     val isSyncing = remember(connectionStatus) { HomeDisplay.isSyncing(connectionStatus) }
+
+    LaunchedEffect(Unit) {
+        sharedViewModel.setTopBarTitle(R.string.route_title_home)
+        sharedViewModel.setTopBarActions(emptyList())
+    }
 
     HomeContent(
         users = users,

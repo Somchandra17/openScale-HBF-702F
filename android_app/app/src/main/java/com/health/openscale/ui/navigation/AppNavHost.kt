@@ -36,25 +36,21 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.health.openscale.ui.screen.graph.GraphScreen
-import com.health.openscale.ui.screen.insights.InsightsScreen
+import com.health.openscale.ui.screen.history.HistoryScreen
+import com.health.openscale.ui.screen.home.HomeScreen
 import com.health.openscale.ui.screen.overview.MeasurementDetailScreen
-import com.health.openscale.ui.screen.overview.OverviewScreen
+import com.health.openscale.ui.screen.report.ReportScreen
 import com.health.openscale.ui.screen.settings.AboutScreen
 import com.health.openscale.ui.screen.settings.BluetoothDetailScreen
 import com.health.openscale.ui.screen.settings.BluetoothScreen
 import com.health.openscale.ui.screen.settings.BluetoothViewModel
-import com.health.openscale.ui.screen.settings.ChartSettingsScreen
+import com.health.openscale.ui.screen.settings.CoachProfileScreen
 import com.health.openscale.ui.screen.settings.DataManagementSettingsScreen
 import com.health.openscale.ui.screen.settings.GeneralSettingsScreen
-import com.health.openscale.ui.screen.settings.MeasurementTypeDetailScreen
-import com.health.openscale.ui.screen.settings.MeasurementTypeSettingsScreen
 import com.health.openscale.ui.screen.settings.SettingsScreen
 import com.health.openscale.ui.screen.settings.SettingsViewModel
 import com.health.openscale.ui.screen.settings.UserDetailScreen
 import com.health.openscale.ui.screen.settings.UserSettingsScreen
-import com.health.openscale.ui.screen.statistics.StatisticsScreen
-import com.health.openscale.ui.screen.table.TableScreen
 import com.health.openscale.ui.shared.SharedViewModel
 
 /**
@@ -72,75 +68,29 @@ fun AppNavHost(
     Column(modifier = Modifier.fillMaxSize()) {
         NavHost(
             navController = navController,
-            startDestination = Routes.OVERVIEW,
+            startDestination = Routes.HOME,
             modifier = Modifier
                 .padding(innerPadding) // Apply padding from Scaffold.
                 .weight(1f)      // NavHost takes the remaining space in the Column.
         ) {
             // Define all composable screens for navigation routes.
-            composable(Routes.OVERVIEW) {
-                OverviewScreen(
+            composable(Routes.HOME) {
+                HomeScreen(
                     navController = navController,
                     sharedViewModel = sharedViewModel,
                     bluetoothViewModel = bluetoothViewModel
                 )
             }
-            composable(
-                route = Routes.OVERVIEW_DRILLDOWN,
-                arguments = listOf(
-                    navArgument("start") { type = NavType.LongType },
-                    navArgument("end")   { type = NavType.LongType }
-                )
-            ) { backStackEntry ->
-                OverviewScreen(
+            composable(Routes.HISTORY) {
+                HistoryScreen(
                     navController = navController,
-                    sharedViewModel = sharedViewModel,
-                    bluetoothViewModel = bluetoothViewModel,
-                    drillDownStartMillis = backStackEntry.arguments?.getLong("start"),
-                    drillDownEndMillis   = backStackEntry.arguments?.getLong("end"),
+                    sharedViewModel = sharedViewModel
                 )
             }
-            composable(Routes.GRAPH) {
-                GraphScreen(
+            composable(Routes.REPORT) {
+                ReportScreen(
                     navController = navController,
-                    sharedViewModel = sharedViewModel,
-                    bluetoothViewModel = bluetoothViewModel
-                )
-            }
-            composable(Routes.TABLE) {
-                TableScreen(
-                    navController = navController,
-                    sharedViewModel = sharedViewModel,
-                    bluetoothViewModel = bluetoothViewModel
-                )
-            }
-            composable(
-                route = Routes.TABLE_DRILLDOWN,
-                arguments = listOf(
-                    navArgument("start") { type = NavType.LongType },
-                    navArgument("end")   { type = NavType.LongType }
-                )
-            ) { backStackEntry ->
-                TableScreen(
-                    navController = navController,
-                    sharedViewModel = sharedViewModel,
-                    bluetoothViewModel = bluetoothViewModel,
-                    drillDownStartMillis = backStackEntry.arguments?.getLong("start"),
-                    drillDownEndMillis   = backStackEntry.arguments?.getLong("end"),
-                )
-            }
-            composable(Routes.STATISTICS) {
-                StatisticsScreen(
-                    navController = navController,
-                    sharedViewModel = sharedViewModel,
-                    bluetoothViewModel = bluetoothViewModel
-                )
-            }
-            composable(Routes.INSIGHTS) {
-                InsightsScreen(
-                    navController = navController,
-                    sharedViewModel = sharedViewModel,
-                    bluetoothViewModel = bluetoothViewModel,
+                    sharedViewModel = sharedViewModel
                 )
             }
             composable(Routes.SETTINGS) {
@@ -168,7 +118,7 @@ fun AppNavHost(
                 route = "${Routes.USER_DETAIL}?id={id}", // Argument in route pattern
                 arguments = listOf(navArgument("id") {
                     type = NavType.IntType
-                    defaultValue = -1 // Indicates a new user if ID is -1 (or not passed)
+                    defaultValue = -1 // No user resolves for -1; UserDetailScreen edits existing users only.
                 })
             ) { backStackEntry ->
                 val userId = backStackEntry.arguments?.getInt("id") ?: -1
@@ -177,15 +127,6 @@ fun AppNavHost(
                     userId = userId,
                     sharedViewModel = sharedViewModel,
                     settingsViewModel = settingsViewModel
-                )
-            }
-            composable(Routes.MEASUREMENT_TYPES) {
-                MeasurementTypeSettingsScreen(
-                    sharedViewModel = sharedViewModel,
-                    settingsViewModel = settingsViewModel,
-                    onEditType = { typeId ->
-                        navController.navigate(Routes.measurementTypeDetail(typeId))
-                    }
                 )
             }
             composable(
@@ -210,21 +151,6 @@ fun AppNavHost(
                     sharedViewModel = sharedViewModel
                 )
             }
-            composable(
-                route = "${Routes.MEASUREMENT_TYPE_DETAIL}?id={id}",
-                arguments = listOf(navArgument("id") {
-                    type = NavType.IntType
-                    defaultValue = -1 // Indicates a new type if ID is -1
-                })
-            ) { backStackEntry ->
-                val typeId = backStackEntry.arguments?.getInt("id") ?: -1
-                MeasurementTypeDetailScreen(
-                    navController = navController,
-                    typeId = typeId,
-                    sharedViewModel = sharedViewModel,
-                    settingsViewModel = settingsViewModel
-                )
-            }
             composable(Routes.BLUETOOTH_SETTINGS) {
                 BluetoothScreen(
                     navController = navController,
@@ -239,11 +165,6 @@ fun AppNavHost(
                     bluetoothViewModel = bluetoothViewModel
                 )
             }
-            composable(Routes.CHART_SETTINGS) {
-                ChartSettingsScreen(
-                    sharedViewModel = sharedViewModel
-                )
-            }
             composable(Routes.DATA_MANAGEMENT_SETTINGS) {
                 DataManagementSettingsScreen(
                     settingsViewModel = settingsViewModel
@@ -251,6 +172,12 @@ fun AppNavHost(
             }
             composable(Routes.ABOUT_SETTINGS) {
                 AboutScreen(
+                    navController = navController,
+                    sharedViewModel = sharedViewModel
+                )
+            }
+            composable(Routes.COACH_PROFILE) {
+                CoachProfileScreen(
                     navController = navController,
                     sharedViewModel = sharedViewModel
                 )

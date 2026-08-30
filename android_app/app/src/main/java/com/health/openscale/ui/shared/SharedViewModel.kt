@@ -46,10 +46,6 @@ import com.health.openscale.core.model.UserEvaluationContext
 import com.health.openscale.core.usecase.MeasurementDemoUseCase
 import com.health.openscale.core.usecase.SyncUseCases
 import com.health.openscale.core.utils.LogManager
-import com.health.openscale.ui.screen.components.AGGREGATION_LEVEL_SUFFIX
-import com.health.openscale.ui.screen.components.CUSTOM_END_DATE_MILLIS_SUFFIX
-import com.health.openscale.ui.screen.components.CUSTOM_START_DATE_MILLIS_SUFFIX
-import com.health.openscale.ui.screen.components.TIME_RANGE_SUFFIX
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -78,6 +74,15 @@ import java.text.DateFormat
 import java.util.Date
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
+
+// Persisted-setting key suffixes for the per-screen-context settings [screenFlow] resolves
+// (time range, aggregation level). Formerly lived alongside the chart settings UI in
+// MeasurementChartSettings.kt (deleted with the graph/table screens); kept here since this is
+// their only remaining reader.
+private const val TIME_RANGE_SUFFIX = "_time_range"
+private const val AGGREGATION_LEVEL_SUFFIX = "_aggregation_level"
+private const val CUSTOM_START_DATE_MILLIS_SUFFIX = "_custom_start_date_millis"
+private const val CUSTOM_END_DATE_MILLIS_SUFFIX = "_custom_end_date_millis"
 
 /**
  * Shared ViewModel coordinating user selection, measurement flows, and UI chrome.

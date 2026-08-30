@@ -75,6 +75,11 @@ fun HistoryScreen(
     val rows = remember(measurements) { HistoryStateMapper.toRows(measurements) }
     val sparklinePoints = remember(measurements) { HistoryStateMapper.sparklinePoints(measurements) }
 
+    LaunchedEffect(Unit) {
+        sharedViewModel.setTopBarTitle(R.string.route_title_history)
+        sharedViewModel.setTopBarActions(emptyList())
+    }
+
     HistoryContent(
         users = users,
         selectedId = selectedUserId ?: -1,

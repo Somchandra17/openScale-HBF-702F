@@ -25,11 +25,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -39,7 +37,6 @@ import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -58,13 +55,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.navigation.NavController
 import com.health.openscale.R
 import com.health.openscale.core.data.InputFieldType
 import com.health.openscale.core.data.MeasurementType
 import com.health.openscale.core.data.UserGoals
 import com.health.openscale.ui.components.RoundMeasurementIcon
-import com.health.openscale.ui.navigation.Routes
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
@@ -72,7 +67,6 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UserGoalDialog(
-    navController: NavController,
     existingUserGoal: UserGoals?,
     allMeasurementTypes: List<MeasurementType>,
     allGoalsOfCurrentUser: List<UserGoals>,
@@ -231,23 +225,6 @@ fun UserGoalDialog(
                             },
                             trailingIcon = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    if (selectedTypeState != null) {
-                                        IconButton(
-                                            onClick = {
-                                                selectedTypeState?.let {
-                                                    navController.navigate(Routes.measurementTypeDetail(typeId = it.id))
-                                                }
-                                            },
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Filled.Edit,
-                                                modifier = Modifier.size(20.dp),
-                                                contentDescription = stringResource(R.string.content_desc_edit_type)
-                                            )
-                                        }
-                                        Spacer(Modifier.width(4.dp))
-                                    }
-
                                     if (!isEditing && targetableTypes.isNotEmpty()) {
                                         ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeDropdownExpanded)
                                         Spacer(Modifier.width(4.dp))

@@ -80,7 +80,6 @@ import com.health.openscale.core.data.GenderType
 import com.health.openscale.core.data.IconResource
 import com.health.openscale.core.data.InputFieldType
 import com.health.openscale.core.data.UnitType
-import com.health.openscale.core.data.User
 import com.health.openscale.core.data.UserGoals
 import com.health.openscale.core.data.UserIcon
 import com.health.openscale.core.utils.ConverterUtils
@@ -98,16 +97,20 @@ import java.util.Locale
 import java.util.TimeZone
 
 /**
- * Composable screen for adding a new user or editing an existing user's details.
+ * Composable screen for editing an existing user's details.
+ *
+ * The coach's roster is a fixed set of clients — this screen supports editing only, there is
+ * no add-mode. If [userId] does not resolve to an existing user (e.g. a stale or malformed
+ * route argument) the screen bails out immediately without ever constructing a user to save.
  *
  * This screen provides input fields for user's name, height, gender, activity level,
- * and birth date. It interacts with [SettingsViewModel] to save or update user data
+ * and birth date. It interacts with [SettingsViewModel] to save updated user data
  * and with [SharedViewModel] to manage top bar actions and titles.
  *
  * @param navController The NavController used for navigation, e.g., to go back after saving.
- * @param userId The ID of the user to edit. If -1, a new user is being added.
+ * @param userId The ID of the user to edit.
  * @param sharedViewModel The ViewModel shared across different screens, used here for top bar configuration and user selection.
- * @param settingsViewModel The ViewModel responsible for user data operations like adding or updating users.
+ * @param settingsViewModel The ViewModel responsible for user data operations like updating users.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -117,11 +120,15 @@ fun UserDetailScreen(
     sharedViewModel: SharedViewModel,
     settingsViewModel: SettingsViewModel
 ) {
-    val isEdit = userId != -1
-
-    // Retrieve the user from SharedViewModel if editing, or prepare for a new user.
+    // Retrieve the user from SharedViewModel. There is no add-mode: if this doesn't resolve to
+    // a real user, there is nothing to edit, so leave immediately without creating anything.
     val user by remember(userId) {
         mutableStateOf(sharedViewModel.allUsers.value.find { it.id == userId })
+    }
+
+    if (user == null) {
+        LaunchedEffect(userId) { navController.popBackStack() }
+        return
     }
 
     var selectedIcon by remember { mutableStateOf(user?.icon ?: UserIcon.IC_DEFAULT) }
@@ -168,7 +175,7 @@ fun UserDetailScreen(
 
     var pendingUserGoals by remember { mutableStateOf(emptyList<UserGoals>()) }
 
-    LaunchedEffect(userGoals, isEdit) {
+    LaunchedEffect(userGoals) {
         if (pendingUserGoals != userGoals) {
             pendingUserGoals = userGoals
         }
@@ -227,31 +234,6 @@ fun UserDetailScreen(
 
 
     /**
-     * Adds a new user and their pending goals to the database.
-     */
-    fun addUser() {
-        val numericHeight = heightValueString.replace(',', '.').toFloatOrNull()
-        val finalHeightCm = if (numericHeight != null && numericHeight > 0f) {
-            if (heightInputUnit == UnitType.CM) numericHeight
-            else ConverterUtils.convertFloatValueUnit(numericHeight, UnitType.INCH, UnitType.CM)
-        } else null
-
-        if (name.isBlank() || finalHeightCm == null || finalHeightCm <= 0f) {
-            Toast.makeText(context, R.string.user_detail_error_invalid_data, Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val newUserToSave = User(
-            id = 0, name = name, icon = selectedIcon, birthDate = birthDate,
-            gender = gender, heightCm = finalHeightCm, activityLevel = activityLevel,
-            useAssistedWeighing = useAssistedWeighing, amputations = amputations
-        )
-        // The ViewModel owns the coroutine (create user + goals + select) and reports via snackbar.
-        settingsViewModel.createUserWithGoals(newUserToSave, pendingUserGoals)
-        navController.popBackStack()
-    }
-
-    /**
      * Updates an existing user's profile and synchronizes their goals with the database.
      */
     fun updateUser() {
@@ -281,18 +263,9 @@ fun UserDetailScreen(
 
     // --- TopBar Save Action ---
     LaunchedEffect(key1 = userId) {
-        sharedViewModel.setTopBarTitle(
-            if (isEdit) resources.getString(R.string.user_detail_edit_user_title)
-            else resources.getString(R.string.user_detail_add_user_title)
-        )
+        sharedViewModel.setTopBarTitle(resources.getString(R.string.user_detail_edit_user_title))
         sharedViewModel.setTopBarAction(
-            TopBarAction(icon = Icons.Default.Save, onClick = {
-                if (!isEdit) {
-                    addUser()
-                } else {
-                    updateUser()
-                }
-            })
+            TopBarAction(icon = Icons.Default.Save, onClick = { updateUser() })
         )
     }
 
@@ -580,7 +553,6 @@ fun UserDetailScreen(
     if (goalDialogContextData.showDialog) {
 
         UserGoalDialog(
-            navController = navController,
             existingUserGoal = goalDialogContextData.existingGoalForDialog,
             allMeasurementTypes = allMeasurementTypes,
             allGoalsOfCurrentUser = pendingUserGoals,
@@ -597,7 +569,7 @@ fun UserDetailScreen(
                     }
                 }
 
-                val targetUserIdForPendingGoal = if (!isEdit) -1 else user!!.id
+                val targetUserIdForPendingGoal = user?.id ?: -1
 
                 val newOrUpdatedPendingGoal = UserGoals(
                     userId = targetUserIdForPendingGoal,

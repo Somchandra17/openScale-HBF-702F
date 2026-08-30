@@ -26,7 +26,6 @@ import com.health.openscale.core.data.Measurement
 import com.health.openscale.core.data.MeasurementValue
 import com.health.openscale.core.database.DatabaseRepository
 import com.health.openscale.core.facade.SettingsFacade
-import com.health.openscale.ui.widget.MeasurementWidget
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
 import java.util.Date
@@ -89,8 +88,6 @@ class MeasurementCrudUseCases @Inject constructor(
             sync.triggerSyncInsert(measurementWithId, finalValues,"com.health.openscale.sync.oss")
             sync.triggerSyncInsert(measurementWithId, finalValues,"com.health.openscale.sync.debug")
 
-            MeasurementWidget.refreshAll(appContext)
-
             maybeVibrateOnMeasurement()
 
             newId
@@ -139,8 +136,6 @@ class MeasurementCrudUseCases @Inject constructor(
             sync.triggerSyncUpdate(measurement, finalValues,"com.health.openscale.sync.oss")
             sync.triggerSyncUpdate(measurement, finalValues,"com.health.openscale.sync.debug")
 
-            MeasurementWidget.refreshAll(appContext)
-
             measurement.id
         }
     }
@@ -161,8 +156,6 @@ class MeasurementCrudUseCases @Inject constructor(
         sync.triggerSyncDelete(measurement.id, measurement.userId, Date(measurement.timestamp), "com.health.openscale.sync")
         sync.triggerSyncDelete(measurement.id, measurement.userId, Date(measurement.timestamp), "com.health.openscale.sync.oss")
         sync.triggerSyncDelete(measurement.id, measurement.userId, Date(measurement.timestamp), "com.health.openscale.sync.debug")
-
-        MeasurementWidget.refreshAll(appContext)
     }
 
     suspend fun recalculateDerivedValuesForMeasurement(measurementId: Int) {
