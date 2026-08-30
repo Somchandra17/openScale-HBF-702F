@@ -63,6 +63,7 @@ object PdfReportRenderer {
     val LOGO_W = LOGO_H * LOGO_ASPECT_W_OVER_H
     const val CLUB_SIZE = 22f
     const val COACH_NAME_SIZE = 12f
+    const val FOOTER_SCALE = 0.70f
 
     // Not `const val`: 0xFF000000.toInt() is not a compile-time constant in Kotlin.
     val INK = 0xFF000000.toInt()
@@ -98,8 +99,9 @@ object PdfReportRenderer {
         val m = model
         val pageUsableWidth = PAGE_W - 2 * MARGIN
         val tableRight = PAGE_W - MARGIN
-        val footerW = pageUsableWidth
+        val footerW = pageUsableWidth * FOOTER_SCALE
         val footerH = footerW / FOOTER_ASPECT_W_OVER_H
+        val footerLeft = MARGIN + (pageUsableWidth - footerW) / 2f
         val footerTop = PAGE_H - MARGIN - footerH
 
         // -- Masthead: logo + club name as the H1, coach identity underneath ------
@@ -198,8 +200,21 @@ object PdfReportRenderer {
         y += 12f
         canvas.drawText("Measured on ${m.deviceName}. Not a medical diagnosis.", MARGIN, y, noteStyle)
 
-        // -- Remarks: kept above the footer so there is room to write --------------
-        y += 24f
+        // -- Summary, then Remarks above the footer --------------------------------
+        if (m.summary.isNotBlank()) {
+            y += 18f
+            canvas.drawText("Summary", MARGIN, y, TextStyle(11f, INK, bold = true))
+            y += 14f
+            val summaryStyle = TextStyle(9f, INK)
+            wrapLines(m.summary, summaryStyle, pageUsableWidth, canvas).forEach { line ->
+                if (y < footerTop - 80f) {
+                    canvas.drawText(line, MARGIN, y, summaryStyle)
+                    y += 12f
+                }
+            }
+        }
+
+        y += 16f
         canvas.drawText("Remarks", MARGIN, y, TextStyle(11f, INK, bold = true))
         y += 8f
         repeat(3) {
@@ -209,7 +224,29 @@ object PdfReportRenderer {
             }
         }
 
-        canvas.drawImage(ReportArtwork.FOOTER, MARGIN, footerTop, footerW, footerH)
+        canvas.drawImage(ReportArtwork.FOOTER, footerLeft, footerTop, footerW, footerH)
+    }
+
+    private fun wrapLines(
+        text: String,
+        style: TextStyle,
+        maxWidth: Float,
+        canvas: ReportCanvas,
+    ): List<String> {
+        val words = text.split(' ')
+        val lines = mutableListOf<String>()
+        var current = ""
+        for (word in words) {
+            val trial = if (current.isEmpty()) word else "$current $word"
+            if (canvas.measureText(trial, style) <= maxWidth) {
+                current = trial
+            } else {
+                if (current.isNotEmpty()) lines += current
+                current = word
+            }
+        }
+        if (current.isNotEmpty()) lines += current
+        return lines
     }
 
     private fun statusStyle(band: Band): TextStyle = when (band) {

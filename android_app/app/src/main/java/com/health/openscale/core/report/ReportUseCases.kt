@@ -73,6 +73,7 @@ class ReportUseCases @Inject constructor(
             heightCm = user.heightCm,
         )
 
+        val rows = ReportRowBuilder.build(values, client)
         ReportModel(
             coach = loadCoachBlock(),
             client = client,
@@ -80,7 +81,8 @@ class ReportUseCases @Inject constructor(
                 Instant.ofEpochMilli(mwv.measurement.timestamp), ZoneId.systemDefault()
             ),
             deviceName = "Omron HBF-702T",
-            rows = ReportRowBuilder.build(values, client),
+            rows = rows,
+            summary = ReportSummary.build(rows),
         )
     }
 

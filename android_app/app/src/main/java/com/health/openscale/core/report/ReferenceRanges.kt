@@ -73,6 +73,42 @@ object ReferenceRanges {
         else -> UNBANDED
     }
 
+    /**
+     * Resting metabolism vs Mifflin–St Jeor predicted BMR for this client.
+     * Normal if measured is within ±10% of predicted. Needs adult age, weight and height.
+     */
+    fun classifyBmr(
+        measuredKcal: Float,
+        ageYears: Int,
+        gender: GenderType,
+        weightKg: Float,
+        heightCm: Float,
+    ): Classification {
+        if (ageYears < MIN_ADULT_AGE || ageYears == CLIENT_AGE_UNKNOWN) return UNBANDED
+        if (weightKg <= 0f || heightCm <= 0f) return UNBANDED
+        val predicted = mifflinStJeor(ageYears, gender, weightKg, heightCm)
+        val lo = predicted * 0.90f
+        val hi = predicted * 1.10f
+        val band = when {
+            measuredKcal < lo -> Band.LOW
+            measuredKcal > hi -> Band.HIGH
+            else -> Band.NORMAL
+        }
+        val predictedInt = kotlin.math.round(predicted).toInt()
+        return Classification(band, bandLabel(band), "$predictedInt kcal (±10%)")
+    }
+
+    /** Mifflin–St Jeor resting kcal/day. */
+    internal fun mifflinStJeor(
+        ageYears: Int,
+        gender: GenderType,
+        weightKg: Float,
+        heightCm: Float,
+    ): Float {
+        val base = 10f * weightKg + 6.25f * heightCm - 5f * ageYears
+        return if (gender == GenderType.FEMALE) base - 161f else base + 5f
+    }
+
     // -- BMI: Indian / Asian-Pacific, sex- and age-independent ---------------------
 
     private fun classifyBmi(value: Float): Classification {

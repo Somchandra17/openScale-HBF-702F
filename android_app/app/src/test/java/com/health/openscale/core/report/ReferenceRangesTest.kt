@@ -115,8 +115,41 @@ class ReferenceRangesTest {
     }
 
     @Test
-    fun `bmr has no band`() {
+    fun `bmr has no band via the generic classify path`() {
         val c = ReferenceRanges.classify(MeasurementTypeKey.BMR, 1420f, 34, GenderType.FEMALE)
+        assertThat(c.band).isEqualTo(Band.NONE)
+    }
+
+    @Test
+    fun `classifyBmr is Normal within 10 percent of Mifflin St Jeor`() {
+        val predicted = ReferenceRanges.mifflinStJeor(34, GenderType.FEMALE, 68.4f, 162f)
+        val c = ReferenceRanges.classifyBmr(predicted, 34, GenderType.FEMALE, 68.4f, 162f)
+        assertThat(c.band).isEqualTo(Band.NORMAL)
+        assertThat(c.normalRange).contains("kcal")
+    }
+
+    @Test
+    fun `classifyBmr is High when measured is well above predicted`() {
+        val c = ReferenceRanges.classifyBmr(2500f, 34, GenderType.FEMALE, 68.4f, 162f)
+        assertThat(c.band).isEqualTo(Band.HIGH)
+        assertThat(c.label).isEqualTo("High")
+    }
+
+    @Test
+    fun `classifyBmr is Low when measured is well below predicted`() {
+        val c = ReferenceRanges.classifyBmr(800f, 34, GenderType.FEMALE, 68.4f, 162f)
+        assertThat(c.band).isEqualTo(Band.LOW)
+    }
+
+    @Test
+    fun `classifyBmr refuses when age is unknown`() {
+        val c = ReferenceRanges.classifyBmr(1420f, CLIENT_AGE_UNKNOWN, GenderType.FEMALE, 68.4f, 162f)
+        assertThat(c.band).isEqualTo(Band.NONE)
+    }
+
+    @Test
+    fun `classifyBmr refuses without height`() {
+        val c = ReferenceRanges.classifyBmr(1420f, 34, GenderType.FEMALE, 68.4f, 0f)
         assertThat(c.band).isEqualTo(Band.NONE)
     }
 

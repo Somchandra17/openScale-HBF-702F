@@ -18,6 +18,7 @@
 package com.health.openscale.ui.screen.home
 
 import com.health.openscale.core.data.ConnectionStatus
+import com.health.openscale.core.data.GenderType
 import com.health.openscale.core.data.MeasurementTypeKey
 import com.health.openscale.core.data.User
 import com.health.openscale.core.model.MeasurementWithValues
@@ -58,22 +59,33 @@ sealed interface HomeUiState {
 }
 
 /**
- * The Home "Edit person" form: name and contact only. Birth date, sex and height are
- * not edited here — the HBF-702T already uses those on-device to compute the reading.
+ * The Home "Edit person" form. Pure so [applyTo] / [from] can be unit-tested without Compose.
+ * [birthDate] uses the same 0L "not set" sentinel as [User.birthDate]. Age, sex and height
+ * are needed for the PDF Status column; the scale does not send them.
  */
 data class ClientEditUiState(
     val name: String,
     val phone: String,
     val email: String,
+    val birthDate: Long,
+    val gender: GenderType,
+    val heightCm: String,
 ) {
-    fun isValid(): Boolean = name.isNotBlank()
+    fun isValid(): Boolean {
+        val height = heightCm.replace(',', '.').toFloatOrNull() ?: return false
+        return name.isNotBlank() && height > 0f
+    }
 
     fun applyTo(user: User): User? {
         if (!isValid()) return null
+        val height = heightCm.replace(',', '.').toFloatOrNull() ?: return null
         return user.copy(
             name = name.trim(),
             phone = phone.trim(),
             email = email.trim(),
+            birthDate = birthDate,
+            gender = gender,
+            heightCm = height,
         )
     }
 
@@ -82,6 +94,13 @@ data class ClientEditUiState(
             name = user.name,
             phone = user.phone,
             email = user.email,
+            birthDate = user.birthDate,
+            gender = user.gender,
+            heightCm = if (user.heightCm > 0f) {
+                String.format(java.util.Locale.US, "%.0f", user.heightCm)
+            } else {
+                ""
+            },
         )
     }
 }

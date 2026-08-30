@@ -161,8 +161,9 @@ class PdfReportRendererTest {
         assertThat(logo.height).isEqualTo(PdfReportRenderer.LOGO_H)
 
         val footer = canvas.images.single { it.key == ReportArtwork.FOOTER }
-        assertThat(footer.left).isEqualTo(margin)
-        assertThat(footer.width).isEqualTo(pageUsableWidth)
+        val expectedW = pageUsableWidth * PdfReportRenderer.FOOTER_SCALE
+        assertThat(footer.width).isEqualTo(expectedW)
+        assertThat(footer.left).isEqualTo(margin + (pageUsableWidth - expectedW) / 2f)
         assertThat(footer.top + footer.height).isEqualTo(PdfReportRenderer.PAGE_H - margin)
     }
 
@@ -175,15 +176,30 @@ class PdfReportRendererTest {
     }
 
     @Test
+    fun `Summary is drawn above Remarks when the model has one`() {
+        val canvas = recordDraw(model().copy(summary = "Body fat is very high and skeletal muscle is low."))
+        val summaryHead = canvas.texts.single { it.text == "Summary" }
+        val remarks = canvas.texts.single { it.text == "Remarks" }
+        assertThat(summaryHead.y).isLessThan(remarks.y)
+        assertThat(canvas.texts.any { it.text.contains("Body fat is very high") }).isTrue()
+    }
+
+    @Test
     fun `an abnormal status is bold and uses the high or low colour`() {
         val canvas = recordDraw()
-        val high = canvas.texts.single { it.x == statusColX && it.text == "High" }
-        assertThat(high.style.bold).isTrue()
-        assertThat(high.style.colour).isEqualTo(PdfReportRenderer.STATUS_HIGH)
+        val highs = canvas.texts.filter { it.x == statusColX && it.text == "High" }
+        assertThat(highs).isNotEmpty()
+        highs.forEach {
+            assertThat(it.style.bold).isTrue()
+            assertThat(it.style.colour).isEqualTo(PdfReportRenderer.STATUS_HIGH)
+        }
 
-        val overweight = canvas.texts.single { it.x == statusColX && it.text == "Overweight" }
-        assertThat(overweight.style.bold).isTrue()
-        assertThat(overweight.style.colour).isEqualTo(PdfReportRenderer.STATUS_HIGH)
+        val overweight = canvas.texts.filter { it.x == statusColX && it.text == "Overweight" }
+        assertThat(overweight).isNotEmpty()
+        overweight.forEach {
+            assertThat(it.style.bold).isTrue()
+            assertThat(it.style.colour).isEqualTo(PdfReportRenderer.STATUS_HIGH)
+        }
     }
 
     @Test

@@ -50,15 +50,23 @@ class ReportModelTest {
     fun `fat mass is weight times body-fat percent, in kg`() {
         val row = rowsFor("WEIGHT" to 68.4f, "BODY_FAT" to 28.1f).single { it.label == "Fat mass" }
         assertThat(row.reading).isEqualTo("19.2 kg")
-        assertThat(row.status).isEqualTo("—")
-        assertThat(row.band).isEqualTo(Band.NONE)
+        assertThat(row.status).isEqualTo("Normal")
+        assertThat(row.band).isEqualTo(Band.NORMAL)
     }
 
     @Test
     fun `muscle mass is weight times skeletal-muscle percent, in kg`() {
         val row = rowsFor("WEIGHT" to 68.4f, "MUSCLE" to 31.0f).single { it.label == "Muscle mass" }
         assertThat(row.reading).isEqualTo("21.2 kg")
-        assertThat(row.status).isEqualTo("—")
+        assertThat(row.status).isEqualTo("High")
+        assertThat(row.band).isEqualTo(Band.HIGH)
+    }
+
+    @Test
+    fun `fat mass inherits the body-fat band`() {
+        val row = rowsFor("WEIGHT" to 68.4f, "BODY_FAT" to 28.1f).single { it.label == "Fat mass" }
+        assertThat(row.status).isEqualTo("Normal")
+        assertThat(row.band).isEqualTo(Band.NORMAL)
     }
 
     @Test
@@ -84,11 +92,12 @@ class ReportModelTest {
     }
 
     @Test
-    fun `weight row carries no status`() {
-        val row = rowsFor("WEIGHT" to 68.4f).single { it.label == "Weight" }
+    fun `weight row inherits the BMI band`() {
+        val row = rowsFor("WEIGHT" to 68.4f, "BMI" to 24.8f).single { it.label == "Weight" }
         assertThat(row.reading).isEqualTo("68.4 kg")
-        assertThat(row.status).isEqualTo("—")
-        assertThat(row.normalRange).isEqualTo("—")
+        assertThat(row.status).isEqualTo("Overweight")
+        assertThat(row.band).isEqualTo(Band.HIGH)
+        assertThat(row.normalRange).isEqualTo("18.0 – 22.9")
     }
 
     @Test
@@ -199,5 +208,119 @@ class ReportModelTest {
         assertThat(row.reading).isEqualTo("41 years")
         assertThat(row.status).isEqualTo("+7 yrs")
         assertThat(row.normalRange).isEqualTo("34 (actual age)")
+    }
+
+    @Test
+    fun `BMR within 10 percent of predicted is Normal`() {
+        // 34yo female, 68.4 kg, 162 cm → Mifflin 1380 kcal. 1420 is within ±10%.
+        val row = rowsFor("WEIGHT" to 68.4f, "BMR" to 1420f).single { it.label == "Resting metabolism" }
+        assertThat(row.status).isEqualTo("Normal")
+        assertThat(row.band).isEqualTo(Band.NORMAL)
+    }
+
+    @Test
+    fun `BMR well above predicted is High`() {
+        val row = rowsFor("WEIGHT" to 68.4f, "BMR" to 2000f).single { it.label == "Resting metabolism" }
+        assertThat(row.status).isEqualTo("High")
+        assertThat(row.band).isEqualTo(Band.HIGH)
+    }
+
+    @Test
+    fun `BMR is unbanded when age is unknown`() {
+        val row = ReportRowBuilder.build(
+            mapOf("WEIGHT" to 68.4f, "BMR" to 1420f),
+            clientWithUnsetProfile,
+        ).single { it.label == "Resting metabolism" }
+        assertThat(row.status).isEqualTo("—")
+        assertThat(row.band).isEqualTo(Band.NONE)
+    }
+
+    // --- Summary: every mix of findings ---------------------------------------
+
+    @Test
+    fun `summary says expected ranges when every banded row is Normal`() {
+        val rows = rowsFor(
+            "WEIGHT" to 55.0f, "BODY_FAT" to 28.1f, "MUSCLE" to 27.0f,
+            "BMI" to 21.0f, "VISCERAL_FAT" to 8.0f, "BMR" to 1230f, "BODY_AGE" to 34f,
+        )
+        assertThat(ReportSummary.build(rows)).isEqualTo("Readings are within the expected ranges.")
+    }
+
+    @Test
+    fun `summary says nothing to summarise when every reading is dashed`() {
+        assertThat(ReportSummary.build(rowsFor())).isEqualTo("No measurements to summarise.")
+    }
+
+    @Test
+    fun `summary covers the printed sheet with mixed highs and lows and an older body age`() {
+        val som = client.copy(ageYears = 23, gender = GenderType.MALE, heightCm = 165f)
+        val rows = ReportRowBuilder.build(
+            mapOf(
+                "WEIGHT" to 73.8f, "BODY_FAT" to 27.3f, "MUSCLE" to 30.8f,
+                "BMI" to 25.5f, "VISCERAL_FAT" to 10.5f, "BMR" to 1644f, "BODY_AGE" to 40f,
+            ),
+            som,
+        )
+        val summary = ReportSummary.build(rows)
+        assertThat(summary).contains("BMI is in the obese range")
+        assertThat(summary).contains("body fat is very high")
+        assertThat(summary).contains("skeletal muscle is low")
+        assertThat(summary).contains("visceral fat is high")
+        assertThat(summary).contains("Body age is 17 years above actual age.")
+        assertThat(summary).doesNotContain("fat mass")
+        assertThat(summary).doesNotContain("muscle mass")
+    }
+
+    @Test
+    fun `summary of a single underweight BMI`() {
+        val rows = rowsFor("BMI" to 17.0f)
+        assertThat(ReportSummary.build(rows)).isEqualTo("BMI is in the underweight range.")
+    }
+
+    @Test
+    fun `summary of a single overweight BMI`() {
+        val rows = rowsFor("BMI" to 24.0f)
+        assertThat(ReportSummary.build(rows)).isEqualTo("BMI is in the overweight range.")
+    }
+
+    @Test
+    fun `summary of only a younger body age`() {
+        val rows = rowsFor("BODY_AGE" to 30f)
+        assertThat(ReportSummary.build(rows)).isEqualTo("Body age is 4 years below actual age.")
+    }
+
+    @Test
+    fun `summary of a one-year body age gap uses the singular`() {
+        val rows = rowsFor("BODY_AGE" to 35f)
+        assertThat(ReportSummary.build(rows)).isEqualTo("Body age is 1 year above actual age.")
+    }
+
+    @Test
+    fun `summary omits body age when actual age is unknown`() {
+        val rows = ReportRowBuilder.build(mapOf("BODY_AGE" to 40f, "BMI" to 25.5f), clientWithUnsetProfile)
+        val summary = ReportSummary.build(rows)
+        assertThat(summary).contains("BMI is in the obese range")
+        assertThat(summary).doesNotContain("Body age")
+    }
+
+    @Test
+    fun `summary of two findings joins with and`() {
+        val rows = rowsFor("BODY_FAT" to 40.0f, "VISCERAL_FAT" to 16.0f)
+        val summary = ReportSummary.build(rows)
+        assertThat(summary).isEqualTo("Body fat is very high and visceral fat is very high.")
+    }
+
+    @Test
+    fun `summary of high BMR is included`() {
+        val rows = rowsFor("WEIGHT" to 68.4f, "BMR" to 2000f)
+        assertThat(ReportSummary.build(rows)).contains("resting metabolism is high")
+    }
+
+    @Test
+    fun `summary does not mention Normal rows`() {
+        val rows = rowsFor("BODY_FAT" to 28.1f, "VISCERAL_FAT" to 16.0f)
+        val summary = ReportSummary.build(rows)
+        assertThat(summary).doesNotContain("body fat")
+        assertThat(summary.lowercase()).contains("visceral fat is very high")
     }
 }
