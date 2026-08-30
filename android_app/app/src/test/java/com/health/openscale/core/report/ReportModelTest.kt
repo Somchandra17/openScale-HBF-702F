@@ -52,6 +52,7 @@ class ReportModelTest {
         assertThat(row.reading).isEqualTo("19.2 kg")
         assertThat(row.status).isEqualTo("Normal")
         assertThat(row.band).isEqualTo(Band.NORMAL)
+        assertThat(row.normalRange).isEqualTo("14.4 – 22.5 kg")
     }
 
     @Test
@@ -60,6 +61,7 @@ class ReportModelTest {
         assertThat(row.reading).isEqualTo("21.2 kg")
         assertThat(row.status).isEqualTo("High")
         assertThat(row.band).isEqualTo(Band.HIGH)
+        assertThat(row.normalRange).isEqualTo("16.6 – 20.7 kg")
     }
 
     @Test
@@ -67,6 +69,7 @@ class ReportModelTest {
         val row = rowsFor("WEIGHT" to 68.4f, "BODY_FAT" to 28.1f).single { it.label == "Fat mass" }
         assertThat(row.status).isEqualTo("Normal")
         assertThat(row.band).isEqualTo(Band.NORMAL)
+        assertThat(row.normalRange).isEqualTo("14.4 – 22.5 kg")
     }
 
     @Test
@@ -97,7 +100,23 @@ class ReportModelTest {
         assertThat(row.reading).isEqualTo("68.4 kg")
         assertThat(row.status).isEqualTo("Overweight")
         assertThat(row.band).isEqualTo(Band.HIGH)
+        assertThat(row.normalRange).isEqualTo("47.2 – 60.1 kg")
+        assertThat(row.normalRange).doesNotContain("%")
+    }
+
+    @Test
+    fun `BMI row still prints the BMI unit range, not kilograms`() {
+        val row = rowsFor("WEIGHT" to 68.4f, "BMI" to 24.8f).single { it.label == "BMI" }
         assertThat(row.normalRange).isEqualTo("18.0 – 22.9")
+    }
+
+    @Test
+    fun `weight range dashes when height is missing`() {
+        val noHeight = client.copy(heightCm = 0f)
+        val row = ReportRowBuilder.build(mapOf("WEIGHT" to 68.4f, "BMI" to 24.8f), noHeight)
+            .single { it.label == "Weight" }
+        assertThat(row.status).isEqualTo("Overweight")
+        assertThat(row.normalRange).isEqualTo("—")
     }
 
     @Test

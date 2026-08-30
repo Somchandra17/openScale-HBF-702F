@@ -128,11 +128,11 @@ object ReportRowBuilder {
         }
 
         return listOf(
-            readingRow(spec(MeasurementTypeKey.WEIGHT), weight, bmiClass),
+            readingRow(spec(MeasurementTypeKey.WEIGHT), weight, rangeInKgFromBmi(bmiClass, client.heightCm)),
             readingRow(spec(MeasurementTypeKey.BODY_FAT), fat, fatClass),
-            derivedMassRow("Fat mass", weight, fat, fatClass),
+            derivedMassRow("Fat mass", weight, fat, rangeInKgFromPercent(fatClass, weight)),
             readingRow(spec(MeasurementTypeKey.MUSCLE), muscle, muscleClass),
-            derivedMassRow("Muscle mass", weight, muscle, muscleClass),
+            derivedMassRow("Muscle mass", weight, muscle, rangeInKgFromPercent(muscleClass, weight)),
             readingRow(spec(MeasurementTypeKey.BMI), bmiValue, bmiClass),
             machineRow(spec(MeasurementTypeKey.VISCERAL_FAT), values, client),
             readingRow(spec(MeasurementTypeKey.BMR), bmr, bmrClass),
@@ -163,6 +163,25 @@ object ReportRowBuilder {
                 ReportRow(spec.label, spec.format(v), c.label, c.normalRange, c.band)
             }
         }
+    }
+
+    private fun rangeInKgFromBmi(c: Classification, heightCm: Float): Classification {
+        val lo = c.normalLow
+        val hi = c.normalHigh
+        if (lo == null || hi == null || heightCm <= 0f) {
+            return c.copy(normalRange = DASH, normalLow = null, normalHigh = null)
+        }
+        val m2 = (heightCm / 100f) * (heightCm / 100f)
+        return c.copy(normalRange = String.format(L, "%.1f – %.1f kg", lo * m2, hi * m2))
+    }
+
+    private fun rangeInKgFromPercent(c: Classification, weightKg: Float?): Classification {
+        val lo = c.normalLow
+        val hi = c.normalHigh
+        if (lo == null || hi == null || weightKg == null || weightKg <= 0f) {
+            return c.copy(normalRange = DASH, normalLow = null, normalHigh = null)
+        }
+        return c.copy(normalRange = String.format(L, "%.1f – %.1f kg", weightKg * lo / 100f, weightKg * hi / 100f))
     }
 
     private fun derivedMassRow(

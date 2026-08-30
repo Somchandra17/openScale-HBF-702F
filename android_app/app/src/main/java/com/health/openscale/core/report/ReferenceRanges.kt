@@ -34,6 +34,8 @@ data class Classification(
     val band: Band,
     val label: String,
     val normalRange: String,
+    val normalLow: Float? = null,
+    val normalHigh: Float? = null,
 )
 
 /**
@@ -124,7 +126,7 @@ object ReferenceRanges {
             Band.HIGH -> "Overweight"
             else -> "Obese"
         }
-        return Classification(band, label, "18.0 – 22.9")
+        return Classification(band, label, "18.0 – 22.9", 18.0f, 22.9f)
     }
 
     // -- Visceral fat: half steps on the 702T, sex- and age-independent ------------
@@ -135,7 +137,7 @@ object ReferenceRanges {
             value < 15.0f -> Band.HIGH
             else -> Band.VERY_HIGH
         }
-        return Classification(band, bandLabel(band), "0.5 – 9.5")
+        return Classification(band, bandLabel(band), "0.5 – 9.5", 0.5f, 9.5f)
     }
 
     // -- Body fat % (Omron / Gallagher et al. 2000) --------------------------------
@@ -191,7 +193,7 @@ object ReferenceRanges {
             else -> Band.VERY_HIGH
         }
         val range = "${fmt(cut.normalLow)} – ${fmt(cut.normalHigh)} $unit"
-        return Classification(band, bandLabel(band), range)
+        return Classification(band, bandLabel(band), range, cut.normalLow, cut.normalHigh)
     }
 
     private fun bandLabel(band: Band): String = when (band) {
