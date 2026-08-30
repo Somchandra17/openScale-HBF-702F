@@ -22,7 +22,6 @@ Install the APK from [Releases](https://github.com/Somchandra17/openScale-HBF-70
 
 # Screenshots
 
-Phone screens are shown at a fixed 180px width so they stay phone-sized on GitHub. The PDF is a document, so it is a little wider.
 
 <table>
   <tr>
