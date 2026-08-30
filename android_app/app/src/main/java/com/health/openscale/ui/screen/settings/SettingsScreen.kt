@@ -25,13 +25,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Bluetooth
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Card
@@ -82,9 +79,7 @@ fun SettingsScreen(
     // Define strings for titles and content descriptions in the Composable context
     val generalSettingsLabel = stringResource(R.string.settings_item_general)
     val userSettingsLabel = stringResource(R.string.settings_item_user)
-    val measurementTypesLabel = stringResource(R.string.settings_item_measurement_types)
     val bluetoothLabel = stringResource(R.string.settings_item_bluetooth)
-    val chartSettingsLabel = stringResource(R.string.settings_item_chart)
     val dataManagementLabel = stringResource(R.string.settings_item_data_management)
     val aboutLabel = stringResource(R.string.settings_item_about)
     val coachProfileLabel = stringResource(R.string.settings_item_coach_profile)
@@ -103,22 +98,10 @@ fun SettingsScreen(
             contentDescription = userSettingsLabel
         ),
         SettingsItem(
-            label = measurementTypesLabel,
-            icon = Icons.Default.Edit,
-            route = Routes.MEASUREMENT_TYPES,
-            contentDescription = measurementTypesLabel
-        ),
-        SettingsItem(
             label = bluetoothLabel,
             icon = Icons.Filled.Bluetooth,
             route = Routes.BLUETOOTH_SETTINGS,
             contentDescription = bluetoothLabel
-        ),
-        SettingsItem(
-            label = chartSettingsLabel,
-            icon = Icons.AutoMirrored.Filled.ShowChart,
-            route = Routes.CHART_SETTINGS,
-            contentDescription = chartSettingsLabel
         ),
         SettingsItem(
             label = dataManagementLabel,

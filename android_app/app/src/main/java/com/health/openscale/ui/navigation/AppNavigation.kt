@@ -132,15 +132,9 @@ fun AppNavigation(sharedViewModel: SharedViewModel) {
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
 
-    // Define the main navigation routes that appear in the navigation drawer
-    val mainRoutes = listOf(
-        Routes.OVERVIEW,
-        Routes.GRAPH,
-        Routes.TABLE,
-        Routes.STATISTICS,
-        Routes.INSIGHTS,
-        Routes.SETTINGS
-    )
+    // Define the main navigation routes that appear in the navigation drawer: the three tabs,
+    // plus Settings (shown after a divider, see the drawer content below).
+    val mainRoutes = Routes.mainTabs() + Routes.SETTINGS
 
     // Collect UI states from SharedViewModel
     val topBarTitleFromVM by sharedViewModel.topBarTitle.collectAsState()

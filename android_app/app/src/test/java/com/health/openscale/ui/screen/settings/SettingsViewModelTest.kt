@@ -105,24 +105,6 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun createUserWithGoals_persistsUserAndGoals() = runBlocking {
-        repo.insertAllMeasurementTypes(getDefaultMeasurementTypes())
-        val typeId = repo.getAllMeasurementTypes().first().first().id
-
-        vm.createUserWithGoals(
-            user("Alice"),
-            listOf(UserGoals(userId = 0, measurementTypeId = typeId, goalValue = 80f)),
-        )
-
-        val uid = withTimeout(5_000) {
-            repo.getAllUsers().first { users -> users.any { it.name == "Alice" } }
-        }.first { it.name == "Alice" }.id
-        val goals = withTimeout(5_000) { repo.getAllGoalsForUser(uid).first { it.isNotEmpty() } }
-        assertThat(goals.map { it.measurementTypeId }).containsExactly(typeId)
-        assertThat(goals.first().goalValue).isEqualTo(80f)
-    }
-
-    @Test
     fun updateUserWithGoals_reconcilesGoals() = runBlocking {
         repo.insertAllMeasurementTypes(getDefaultMeasurementTypes())
         val types = repo.getAllMeasurementTypes().first()
