@@ -24,15 +24,21 @@ import com.health.openscale.core.report.CoachBlock
 import com.health.openscale.core.report.ReportModel
 import com.health.openscale.ui.screen.history.HistoryRow
 import org.junit.Test
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.util.Locale
 
 /**
  * Tests for the pure decisions behind the Report screen — [ReportSelection] (default weigh-in,
- * export-enabled), [ReportPreviewMapper] (header preview from a built [ReportModel]) and
+ * CSV/PDF export-enabled), [ReportPreviewMapper] (header preview from a built [ReportModel]) and
  * [ReportCsvNaming]. [ReportContent] (ReportScreen.kt) has no JVM-testable Compose harness in
  * this project; see the UI Testing Policy in the Task 11 brief. [ReportContent] itself is left
  * to render already-decided state and is verified on-device at sign-off.
+ *
+ * [ReportViewModel]'s own Empty/Loading/Loaded/Failed state machine — where the "PDF button
+ * enabled while still a no-op" defect actually lived — is covered separately in
+ * `ReportViewModelStateTest` (needs a real Room DB via Robolectric; these tests here stay plain
+ * JVM/no-Robolectric for speed).
  */
 class ReportViewModelTest {
 
@@ -57,17 +63,40 @@ class ReportViewModelTest {
     }
 
     // -------------------------------------------------------------------------
-    // ReportSelection.isExportEnabled
+    // ReportSelection.isCsvExportEnabled
     // -------------------------------------------------------------------------
 
     @Test
-    fun `isExportEnabled is false with nothing selected`() {
-        assertThat(ReportSelection.isExportEnabled(null)).isFalse()
+    fun `isCsvExportEnabled is false with nothing selected`() {
+        assertThat(ReportSelection.isCsvExportEnabled(null)).isFalse()
     }
 
     @Test
-    fun `isExportEnabled is true once a weigh-in is selected`() {
-        assertThat(ReportSelection.isExportEnabled(12)).isTrue()
+    fun `isCsvExportEnabled is true once a weigh-in is selected, independent of preview load state`() {
+        // CSV never touches the built ReportModel/header preview — only the selection matters.
+        assertThat(ReportSelection.isCsvExportEnabled(12)).isTrue()
+    }
+
+    // -------------------------------------------------------------------------
+    // ReportSelection.isPdfExportEnabled
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `isPdfExportEnabled is false with nothing selected, even if previewLoaded is (incorrectly) true`() {
+        assertThat(ReportSelection.isPdfExportEnabled(null, previewLoaded = true)).isFalse()
+    }
+
+    @Test
+    fun `isPdfExportEnabled is false while the preview is still loading -- the dead-click case`() {
+        // This is the exact regression this fix closes: a weigh-in IS selected, but the async
+        // buildModel() call hasn't resolved yet, so there is no suggested file name to launch
+        // the SAF picker with. The button must not be enabled here.
+        assertThat(ReportSelection.isPdfExportEnabled(12, previewLoaded = false)).isFalse()
+    }
+
+    @Test
+    fun `isPdfExportEnabled is true only once both a weigh-in is selected and the preview has loaded`() {
+        assertThat(ReportSelection.isPdfExportEnabled(12, previewLoaded = true)).isTrue()
     }
 
     // -------------------------------------------------------------------------
@@ -165,16 +194,40 @@ class ReportViewModelTest {
     // ReportCsvNaming.suggestedFileName
     // -------------------------------------------------------------------------
 
+    private val exportDate = LocalDate.of(2026, 8, 30)
+
+    @Test
+    fun `csv file name matches the PDF's shape -- client name, then the date`() {
+        assertThat(ReportCsvNaming.suggestedFileName("Asha Verma", exportDate))
+            .isEqualTo("Asha_Verma - 30 Aug 2026.csv")
+    }
+
+    @Test
+    fun `csv file name no longer leaks the app name`() {
+        // Unlike the old "openScale_export_..." prefix, the new shape names only the client and
+        // the date -- matching ReportUseCases.suggestedFileName's own "never leak the app name"
+        // rule for the PDF.
+        val name = ReportCsvNaming.suggestedFileName("Asha Verma", exportDate).lowercase()
+        assertThat(name).doesNotContain("openscale")
+    }
+
     @Test
     fun `csv file name replaces whitespace in the client name with underscores`() {
-        assertThat(ReportCsvNaming.suggestedFileName("Asha Verma"))
-            .isEqualTo("openScale_export_Asha_Verma.csv")
+        assertThat(ReportCsvNaming.suggestedFileName("Asha Verma", exportDate))
+            .contains("Asha_Verma")
     }
 
     @Test
     fun `csv file name truncates a very long client name`() {
         val longName = "A".repeat(50)
-        val fileName = ReportCsvNaming.suggestedFileName(longName)
-        assertThat(fileName).isEqualTo("openScale_export_${"A".repeat(20)}.csv")
+        val fileName = ReportCsvNaming.suggestedFileName(longName, exportDate)
+        assertThat(fileName).isEqualTo("${"A".repeat(20)} - 30 Aug 2026.csv")
+    }
+
+    @Test
+    fun `csv file name defaults the export date to today when not given`() {
+        val fileName = ReportCsvNaming.suggestedFileName("Asha Verma")
+        val todayLabel = LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.US))
+        assertThat(fileName).isEqualTo("Asha_Verma - $todayLabel.csv")
     }
 }

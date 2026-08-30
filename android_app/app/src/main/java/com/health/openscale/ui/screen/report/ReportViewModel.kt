@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import javax.inject.Inject
@@ -56,8 +57,22 @@ object ReportSelection {
      */
     fun defaultMeasurementId(rows: List<HistoryRow>): Int? = rows.firstOrNull()?.measurementId
 
-    /** Both export buttons need a weigh-in selected; nothing else gates them. */
-    fun isExportEnabled(selectedMeasurementId: Int?): Boolean = selectedMeasurementId != null
+    /**
+     * CSV only needs a weigh-in selected to know *which client's* whole history to export — it
+     * doesn't touch the built [ReportModel]/header preview at all.
+     */
+    fun isCsvExportEnabled(selectedMeasurementId: Int?): Boolean = selectedMeasurementId != null
+
+    /**
+     * PDF additionally needs the header preview to have finished loading (`previewLoaded`):
+     * unlike CSV, it needs a real, built [ReportModel] — and the suggested filename that comes
+     * with it — to act on. Gating this on selection alone (as CSV can) made the button enabled
+     * the instant a weigh-in was picked, while [ReportViewModel.onSelectionChanged]'s async
+     * `buildModel` call was still in flight — a real, steady-state dead click on first entry to
+     * this screen and after every row pick, not a rare race. See the Task 11 fix report.
+     */
+    fun isPdfExportEnabled(selectedMeasurementId: Int?, previewLoaded: Boolean): Boolean =
+        isCsvExportEnabled(selectedMeasurementId) && previewLoaded
 }
 
 /**
@@ -106,13 +121,20 @@ object ReportPreviewMapper {
  * Suggested CSV export filename for a client's *entire* history. Deliberately not scoped to a
  * single weigh-in (unlike the PDF's [ReportUseCases.suggestedFileName]) — the CSV export is a
  * full spreadsheet dump, not a client handout; see the Task 11 report for why the two exports
- * differ in scope. Mirrors the naming convention already used for CSV export elsewhere
- * ([com.health.openscale.ui.screen.settings.SettingsViewModel.startExportProcess]).
+ * differ in scope. Same *shape* as the PDF's name, though — `"<Client Name> - <date>.csv"` — so
+ * the coach's two exports for the same client read as a matched pair rather than one looking
+ * like it came from a different app than the other. [exportDate] is the export's own date, not
+ * any single measurement's (there is no one weigh-in a whole-history dump belongs to), and
+ * defaults to today. The sanitising this had before (whitespace → underscore, a 20-char cap on
+ * the name) is unchanged.
  */
 object ReportCsvNaming {
-    fun suggestedFileName(userName: String): String {
+
+    private val EXPORT_DATE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.US)
+
+    fun suggestedFileName(userName: String, exportDate: LocalDate = LocalDate.now()): String {
         val safeName = userName.replace("\\s+".toRegex(), "_").take(20)
-        return "openScale_export_$safeName.csv"
+        return "$safeName - ${exportDate.format(EXPORT_DATE_FORMAT)}.csv"
     }
 }
 

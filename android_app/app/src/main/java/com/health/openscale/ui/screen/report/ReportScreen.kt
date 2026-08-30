@@ -30,13 +30,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -152,6 +156,7 @@ fun ReportScreen(
         onPick = { selectedMeasurementId = it },
         preview = (previewState as? ReportViewModel.PreviewState.Loaded)?.preview,
         previewFailed = previewState is ReportViewModel.PreviewState.Failed,
+        previewLoading = previewState is ReportViewModel.PreviewState.Loading,
         onExportPdf = {
             val fileName = (previewState as? ReportViewModel.PreviewState.Loaded)?.suggestedFileName
             if (fileName != null) pdfLauncher.launch(fileName)
@@ -170,9 +175,15 @@ fun ReportScreen(
  *
  * The two export actions deliberately differ in scope: [onExportPdf] exports only
  * [selectedMeasurementId] (a client handout, one sheet per visit); [onExportCsv] exports that
- * client's *entire* history (a spreadsheet dump), independent of which row is picked. Both are
- * disabled together — [ReportSelection.isExportEnabled] — since both still need a client with at
- * least one weigh-in to make sense of "this client's report".
+ * client's *entire* history (a spreadsheet dump), independent of which row is picked. Their
+ * enabled states differ too, on purpose: CSV only needs a weigh-in selected
+ * ([ReportSelection.isCsvExportEnabled]); PDF additionally needs the header preview to have
+ * finished loading ([ReportSelection.isPdfExportEnabled]), since it needs a real, built
+ * `ReportModel` (and the filename that comes with it) to act on — see
+ * [ReportSelection.isPdfExportEnabled]'s doc for why enabling it any earlier is a dead click,
+ * not a rare race. While that load is in flight, the PDF button shows a progress spinner
+ * (mirroring `HomeContent`'s "Sync scale" button) so the disabled state reads as "still working",
+ * not as "broken".
  */
 @Composable
 fun ReportContent(
@@ -187,8 +198,10 @@ fun ReportContent(
     onExportCsv: () -> Unit,
     modifier: Modifier = Modifier,
     previewFailed: Boolean = false,
+    previewLoading: Boolean = false,
 ) {
-    val exportEnabled = ReportSelection.isExportEnabled(selectedMeasurementId)
+    val csvExportEnabled = ReportSelection.isCsvExportEnabled(selectedMeasurementId)
+    val pdfExportEnabled = ReportSelection.isPdfExportEnabled(selectedMeasurementId, previewLoaded = preview != null)
 
     Column(modifier = modifier.fillMaxSize()) {
         UserSwitcherRow(users = users, selectedId = selectedId, onSelect = onSelect)
@@ -233,14 +246,22 @@ fun ReportContent(
         ) {
             Button(
                 onClick = onExportPdf,
-                enabled = exportEnabled,
+                enabled = pdfExportEnabled,
                 modifier = Modifier.weight(1f),
             ) {
+                if (previewLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        color = LocalContentColor.current,
+                        strokeWidth = 2.dp,
+                    )
+                    Spacer(modifier = Modifier.size(8.dp))
+                }
                 Text(stringResource(R.string.report_action_export_pdf))
             }
             OutlinedButton(
                 onClick = onExportCsv,
-                enabled = exportEnabled,
+                enabled = csvExportEnabled,
                 modifier = Modifier.weight(1f),
             ) {
                 Text(stringResource(R.string.report_action_export_csv))
