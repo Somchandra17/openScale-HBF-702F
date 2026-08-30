@@ -406,6 +406,7 @@ enum class MeasurementTypeKey(
     ICW(32, R.string.measurement_type_icw, listOf(UnitType.PERCENT, UnitType.KG, UnitType.LB, UnitType.ST), listOf(InputFieldType.FLOAT)),
     PROTEIN(33, R.string.measurement_type_protein, listOf(UnitType.PERCENT, UnitType.KG, UnitType.LB, UnitType.ST), listOf(InputFieldType.FLOAT)),
     BCM(34, R.string.measurement_type_bcm, listOf(UnitType.KG, UnitType.LB, UnitType.ST), listOf(InputFieldType.FLOAT)),
+    BODY_AGE(35, R.string.measurement_type_body_age, listOf(UnitType.NONE), listOf(InputFieldType.FLOAT)),
     CUSTOM(99, R.string.measurement_type_custom_default_name, UnitType.entries.toList(), listOf(InputFieldType.FLOAT, InputFieldType.INT, InputFieldType.TEXT, InputFieldType.DATE, InputFieldType.TIME));
 }
 

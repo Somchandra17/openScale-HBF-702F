@@ -191,6 +191,7 @@
     <string name="measurement_type_icw">Intracellular water</string>
     <string name="measurement_type_protein">Protein</string>
     <string name="measurement_type_bcm">Body cell mass</string>
+    <string name="measurement_type_body_age">Body age</string>
     <string name="s400_bone_formula_label">Bone formula</string>
     <string name="s400_bone_formula_mi_legacy">Impedance-based regression (Legacy)</string>
     <string name="s400_bone_formula_heymsfield">Heymsfield (anthropometric)</string>

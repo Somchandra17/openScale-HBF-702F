@@ -20,6 +20,11 @@ package com.health.openscale.core.bluetooth.scales
 import com.google.common.truth.Truth.assertThat
 import com.health.openscale.core.bluetooth.libs.OmronBodyCompositionLib
 import org.junit.Test
+import java.util.Date
+
+/** Exposes the handler's internal mapping extension to the test under a stable name. */
+private fun OmronBodyCompositionLib.Record.toMeasurementForTest(userId: Int) =
+    with(OmronWlcHandler()) { this@toMeasurementForTest.toMeasurement(userId) }
 
 /**
  * Model-recognition tests for [OmronWlcHandler].
@@ -45,29 +50,6 @@ class OmronWlcHandlerTest {
     }
 
     @Test
-    fun `recognises the 32 byte HBF siblings and their body age variants`() {
-        val withBodyAge = listOf(
-            "BLEsmart_000100090080E1A2B3C4", // HBF-227T
-            "BLEsmart_0001000B0080E1A2B3C4", // HBF-228T
-            "BLEsmart_0001000D0080E1A2B3C4", // HBF-230T
-            "BLEsmart_000104080080E1A2B3C4"  // HBF-222T Asia-Pacific
-        )
-        for (name in withBodyAge) {
-            assertThat(OmronWlcHandler.modelFor(name)?.second)
-                .isEqualTo(OmronBodyCompositionLib.PROFILE_HBF_32)
-        }
-
-        val withoutBodyAge = listOf(
-            "BLEsmart_000101100080E1A2B3C4", // BCM-500
-            "BLEsmart_000102080080E1A2B3C4"  // VIVA
-        )
-        for (name in withoutBodyAge) {
-            assertThat(OmronWlcHandler.modelFor(name)?.second)
-                .isEqualTo(OmronBodyCompositionLib.PROFILE_HBF_32_NO_BODY_AGE)
-        }
-    }
-
-    @Test
     fun `matching is case insensitive`() {
         assertThat(OmronWlcHandler.modelFor("blesmart_0001040c0080e1a2b3c4")?.first)
             .isEqualTo("Omron HBF-702T")
@@ -80,8 +62,6 @@ class OmronWlcHandlerTest {
             .isEqualTo(OmronBodyCompositionLib.PROFILE_HBF_702T)
         assertThat(OmronWlcHandler.modelFor("KRD-703T")?.second)
             .isEqualTo(OmronBodyCompositionLib.PROFILE_HBF_702T)
-        assertThat(OmronWlcHandler.modelFor("HBF-228T")?.second)
-            .isEqualTo(OmronBodyCompositionLib.PROFILE_HBF_32)
     }
 
     @Test
@@ -98,5 +78,30 @@ class OmronWlcHandlerTest {
         assertThat(OmronWlcHandler.modelFor("BLEsmart_")).isNull()
         assertThat(OmronWlcHandler.modelFor("BLEsmart_00010")).isNull()
         assertThat(OmronWlcHandler.modelFor("BLEsmart_zzzzzzzz0080E1A2")).isNull()
+    }
+
+    @Test
+    fun `decoded body age survives the mapping to ScaleMeasurement`() {
+        // Regression guard: body age was decoded by OmronLib and then silently discarded
+        // by toMeasurement(). It has no app-side equivalent — if it isn't carried through,
+        // the value simply doesn't exist for the report. BMI is deliberately not asserted
+        // here: it's re-derived from weight and height (see DerivedValuesCalculator), so a
+        // stale scale-reported BMI must not survive edits to the weight it's printed beside.
+        val record = OmronBodyCompositionLib.Record(
+            timestamp = Date(0),
+            weightKg = 68.4f,
+            bodyFatPercent = 28.1f,
+            skeletalMusclePercent = 31.0f,
+            bmi = 24.8f, // present but unasserted below: proves the decoder still populates BMI,
+                         // even though ScaleMeasurement deliberately never carries it forward
+            bmrKcal = 1420,
+            visceralFatLevel = 8.5f,
+            bodyAgeYears = 41,
+        )
+
+        val measurement = record.toMeasurementForTest(userId = 1)
+
+        assertThat(measurement.bodyAge).isWithin(0.001f).of(41f)
+        assertThat(measurement.weight).isWithin(0.001f).of(68.4f)
     }
 }

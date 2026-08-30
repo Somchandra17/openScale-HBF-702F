@@ -1,0 +1,100 @@
+package com.health.openscale.core.report
+
+import com.google.common.truth.Truth.assertThat
+import com.health.openscale.core.data.GenderType
+import org.junit.Test
+import java.time.LocalDateTime
+
+class ReportModelTest {
+
+    private val coach = CoachBlock(
+        name = "Reena Chandra",
+        title = "Weight Loss Coach",
+        club = "",
+        phone = "98xxxxxxxx",
+        email = "reena@example.com",
+    )
+
+    private val client = ClientBlock(
+        name = "Asha Verma",
+        phone = "98xxxxxxxx",
+        email = "asha@example.com",
+        ageYears = 34,
+        gender = GenderType.FEMALE,
+        heightCm = 162f,
+    )
+
+    private fun rowsFor(vararg values: Pair<String, Float>) =
+        ReportRowBuilder.build(values.toMap(), client)
+
+    @Test
+    fun `builds seven rows in a fixed order`() {
+        val model = ReportModel(
+            coach = coach,
+            client = client,
+            measuredAt = LocalDateTime.of(2026, 8, 30, 9, 14),
+            deviceName = "Omron HBF-702T",
+            rows = rowsFor(
+                "WEIGHT" to 68.4f, "BODY_FAT" to 28.1f, "MUSCLE" to 31.0f,
+                "BMI" to 24.8f, "VISCERAL_FAT" to 8.5f, "BMR" to 1420f, "BODY_AGE" to 41f,
+            ),
+        )
+        assertThat(model.rows).hasSize(7)
+        assertThat(model.rows.map { it.label }).containsExactly(
+            "Weight", "Body fat", "Skeletal muscle", "BMI",
+            "Visceral fat", "Resting metabolism", "Body age",
+        ).inOrder()
+    }
+
+    @Test
+    fun `a missing metric still produces a row with dashes`() {
+        // The sheet's shape must be constant; never omit a row.
+        val rows = rowsFor("WEIGHT" to 68.4f)
+        val fatRow = rows.single { it.label == "Body fat" }
+        assertThat(fatRow.reading).isEqualTo("—")
+        assertThat(fatRow.status).isEqualTo("—")
+    }
+
+    @Test
+    fun `weight row carries no status`() {
+        val row = rowsFor("WEIGHT" to 68.4f).single { it.label == "Weight" }
+        assertThat(row.reading).isEqualTo("68.4 kg")
+        assertThat(row.status).isEqualTo("—")
+        assertThat(row.normalRange).isEqualTo("—")
+    }
+
+    @Test
+    fun `body fat row is classified against the client's age and sex`() {
+        val row = rowsFor("BODY_FAT" to 28.1f).single { it.label == "Body fat" }
+        assertThat(row.reading).isEqualTo("28.1 %")
+        assertThat(row.status).isEqualTo("Normal")
+        assertThat(row.normalRange).isEqualTo("21.0 – 32.9 %")
+    }
+
+    @Test
+    fun `body age row shows the delta against actual age`() {
+        val row = rowsFor("BODY_AGE" to 41f).single { it.label == "Body age" }
+        assertThat(row.reading).isEqualTo("41 years")
+        assertThat(row.status).isEqualTo("+7 yrs")
+        assertThat(row.normalRange).isEqualTo("34 (actual age)")
+    }
+
+    @Test
+    fun `body age below actual age shows a negative delta`() {
+        val row = rowsFor("BODY_AGE" to 30f).single { it.label == "Body age" }
+        assertThat(row.status).isEqualTo("-4 yrs")
+    }
+
+    @Test
+    fun `bmr prints kcal and carries no status`() {
+        val row = rowsFor("BMR" to 1420f).single { it.label == "Resting metabolism" }
+        assertThat(row.reading).isEqualTo("1420 kcal")
+        assertThat(row.status).isEqualTo("—")
+    }
+
+    @Test
+    fun `water is never a row`() {
+        // The HBF-702T does not measure it.
+        assertThat(rowsFor("WEIGHT" to 68.4f).map { it.label }).doesNotContain("Water")
+    }
+}

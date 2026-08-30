@@ -47,7 +47,7 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext ctx: Context): AppDatabase =
         Room.databaseBuilder(ctx, AppDatabase::class.java, AppDatabase.Companion.DATABASE_NAME)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16)
             .build()
 
     @Provides
@@ -74,7 +74,7 @@ object DatabaseModule {
         MeasurementValue::class,
         MeasurementType::class,
     ],
-    version = 15,
+    version = 16,
     exportSchema = true
 )
 @TypeConverters(DatabaseConverters::class)
@@ -556,6 +556,52 @@ val MIGRATION_13_14 = object : Migration(13, 14) {
     }
 }
 
+val MIGRATION_15_16 = object : Migration(15, 16) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Client contact details for the printed report header. Non-null with an
+        // empty default so existing rows migrate without a backfill pass.
+        db.execSQL("ALTER TABLE User ADD COLUMN phone TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE User ADD COLUMN email TEXT NOT NULL DEFAULT ''")
+
+        // BODY_AGE is reported by the HBF-702T but had no type until now. Every column
+        // below (including the five flags) is read from getDefaultMeasurementTypes() so
+        // upgraded installs match fresh ones — if that entry's flags ever change, this
+        // migration picks up the change instead of silently diverging from a literal.
+        val bodyAge = getDefaultMeasurementTypes()
+            .first { it.key == MeasurementTypeKey.BODY_AGE }
+
+        // displayOrder is NOT NULL with no default — append after the current maximum
+        // so the new type lands at the end of the user's existing ordering.
+        val nextOrder = db.query("SELECT IFNULL(MAX(displayOrder), -1) + 1 FROM MeasurementType")
+            .use { c -> if (c.moveToFirst()) c.getInt(0) else 0 }
+
+        // `name` is nullable and stays NULL: it is only consulted for CUSTOM types,
+        // which resolve their label from the row instead of the key's string resource.
+        db.execSQL(
+            """
+            INSERT INTO MeasurementType
+                (`key`, `name`, `color`, `icon`, `unit`, `inputType`, `displayOrder`,
+                 `isDerived`, `isEnabled`, `isPinned`, `isOnRightYAxis`, `isInternal`)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """.trimIndent(),
+            arrayOf<Any?>(
+                bodyAge.key.name,
+                null,
+                bodyAge.color,
+                bodyAge.icon.name,
+                bodyAge.unit.name,
+                bodyAge.inputType.name,
+                nextOrder,
+                if (bodyAge.isDerived) 1 else 0,
+                if (bodyAge.isEnabled) 1 else 0,
+                if (bodyAge.isPinned) 1 else 0,
+                if (bodyAge.isOnRightYAxis) 1 else 0,
+                if (bodyAge.isInternal) 1 else 0
+            )
+        )
+    }
+}
+
 val MIGRATION_14_15 = object : Migration(14, 15) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // Add the `isInternal` column used to hide raw inputs (e.g. BIA
@@ -622,3 +668,4 @@ val MIGRATION_14_15 = object : Migration(14, 15) {
         }
     }
 }
+

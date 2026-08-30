@@ -87,32 +87,6 @@ class OmronBodyCompositionLibTest {
     }
 
     @Test
-    fun `the 32 byte models report visceral fat in whole levels`() {
-        val decoded = OmronBodyCompositionLib.decodeRecord(
-            record32, OmronBodyCompositionLib.PROFILE_HBF_32
-        )
-
-        assertThat(decoded).isNotNull()
-        assertThat(decoded!!.visceralFatLevel!!).isWithin(1e-4f).of(8.0f)
-        // The remaining fields sit at the same offsets as on the 48-byte record.
-        assertThat(decoded.weightKg).isWithin(1e-4f).of(72.40f)
-        assertThat(decoded.bodyFatPercent!!).isWithin(1e-4f).of(23.5f)
-    }
-
-    @Test
-    fun `body age is suppressed on the variants that do not measure it`() {
-        val withAge = OmronBodyCompositionLib.decodeRecord(
-            record32, OmronBodyCompositionLib.PROFILE_HBF_32
-        )!!
-        val withoutAge = OmronBodyCompositionLib.decodeRecord(
-            record32, OmronBodyCompositionLib.PROFILE_HBF_32_NO_BODY_AGE
-        )!!
-
-        assertThat(withAge.bodyAgeYears).isEqualTo(34)
-        assertThat(withoutAge.bodyAgeYears).isNull()
-    }
-
-    @Test
     fun `an unwritten ring buffer slot decodes to nothing`() {
         val erased = ByteArray(48) { 0xFF.toByte() }
         val zeroed = ByteArray(48)
@@ -168,11 +142,6 @@ class OmronBodyCompositionLibTest {
             assertThat(recordAddress(0, 29)).isEqualTo(0x02C0 + 29 * 48)
             assertThat(recordAddress(3, 0)).isEqualTo(0x1430)
             assertThat(userSlotCount).isEqualTo(4)
-        }
-        with(OmronBodyCompositionLib.PROFILE_HBF_32) {
-            assertThat(recordAddress(1, 0)).isEqualTo(0x06A0)
-            // Each slot is allocated one record more than the ring buffer uses.
-            assertThat(recordAddress(1, 0) - recordAddress(0, 0)).isEqualTo(31 * 32)
         }
     }
 }

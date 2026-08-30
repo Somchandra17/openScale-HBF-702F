@@ -17,7 +17,6 @@
  */
 package com.health.openscale.core.bluetooth.scales
 
-import android.bluetooth.le.ScanResult
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -78,30 +77,16 @@ enum class DeviceCapability(
     BATTERY_LEVEL(    R.string.cap_battery,          Icons.Outlined.BatteryStd )
 }
 
-/**
- * Defines whether a device communicates via a GATT connection
- * or only via broadcast advertisements.
- */
-enum class LinkMode { CONNECT_GATT, BROADCAST_ONLY, CLASSIC_SPP }
-
-/**
- * Signals how the handler consumed an advertisement.
- * - IGNORED: payload not relevant; adapter keeps scanning silently.
- * - CONSUMED_KEEP_SCANNING: payload processed, but we want to continue scanning (e.g., waiting for stability).
- * - CONSUMED_STOP: final payload processed; adapter should stop scanning and finish the session.
- */
-enum class BroadcastAction { IGNORED, CONSUMED_KEEP_SCANNING, CONSUMED_STOP }
+/** Only one link mode survives: the Omron HBF-702T is read over a GATT connection. */
+enum class LinkMode { CONNECT_GATT }
 
 /**
  * # ScaleDeviceHandler
  *
  * Minimal base class for a **device-specific** BLE protocol handler.
  *
- * For GATT devices, the app (via `ModernScaleAdapter`) injects a BLE [Transport] and [Callbacks],
- * then calls [onConnected] and forwards notifications to [onNotification].
- *
- * For broadcast-only devices, the adapter attaches a **no-op** transport and forwards
- * advertisement frames to [onAdvertisement]. The handler can call [publish] to emit results.
+ * The app (via `ModernScaleAdapter`) injects a BLE [Transport] and [Callbacks], then calls
+ * [onConnected] and forwards notifications to [onNotification].
  *
  * Threading: the adapter serializes and paces BLE I/O. Avoid sleeps or blocking work inside your
  * handler; just call the helpers in the order your protocol requires.
@@ -209,12 +194,6 @@ abstract class ScaleDeviceHandler {
 
     /** Optional cleanup hook. */
     protected open fun onDisconnected() = Unit
-
-    /**
-     * Called for each advertisement seen for the target device (broadcast-only devices).
-     * Default implementation ignores the advertisement.
-     */
-    open fun onAdvertisement(result: ScanResult, user: ScaleUser): BroadcastAction = BroadcastAction.IGNORED
 
     // --- Protected helper methods (use these from your handler) ----------------
 

@@ -30,5 +30,8 @@ data class User(
     val heightCm: Float,
     val activityLevel: ActivityLevel,
     val useAssistedWeighing: Boolean,
-    val amputations: Map<Limb, AmputationPart> = emptyMap()
+    val amputations: Map<Limb, AmputationPart> = emptyMap(),
+    // Printed on the report header; never used for anything else.
+    val phone: String = "",
+    val email: String = "",
 )

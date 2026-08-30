@@ -50,6 +50,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.io.IOException
 import java.util.UUID
@@ -125,6 +126,13 @@ object SettingsPreferenceKeys {
     val BODY_FAT_FORMULA_OPTION   = stringPreferencesKey("body_fat_formula_option")
     val BODY_WATER_FORMULA_OPTION = stringPreferencesKey("body_water_formula_option")
     val LBM_FORMULA_OPTION        = stringPreferencesKey("lbm_formula_option")
+
+    // --- Coach profile (printed on the client report header) ---
+    val COACH_NAME  = stringPreferencesKey("coach_name")
+    val COACH_TITLE = stringPreferencesKey("coach_title")
+    val COACH_CLUB  = stringPreferencesKey("coach_club")
+    val COACH_PHONE = stringPreferencesKey("coach_phone")
+    val COACH_EMAIL = stringPreferencesKey("coach_email")
 
     // Context strings for screen-specific settings (can be used as prefixes for dynamic keys)
     const val OVERVIEW_SCREEN_CONTEXT = "overview_screen"
@@ -288,6 +296,13 @@ interface SettingsFacade {
 
     val autoConnectOnStartup: Flow<Boolean>
     suspend fun setAutoConnectOnStartup(enabled: Boolean)
+
+    // --- Coach profile (printed on the client report header) ---
+    suspend fun coachName(): String
+    suspend fun coachTitle(): String
+    suspend fun coachClub(): String
+    suspend fun coachPhone(): String
+    suspend fun coachEmail(): String
 
     /**
      * Developer mode for the saved scale: every connection is routed to the diagnostic handler,
@@ -633,6 +648,22 @@ class SettingsFacadeImpl @Inject constructor(
     override suspend fun setAutoConnectOnStartup(enabled: Boolean) {
         saveSetting(SettingsPreferenceKeys.SAVED_BLUETOOTH_AUTO_CONNECT.name, enabled)
     }
+
+    // --- Coach profile (printed on the client report header) ---
+    override suspend fun coachName(): String =
+        observeSetting(SettingsPreferenceKeys.COACH_NAME.name, "Reena Chandra").first()
+
+    override suspend fun coachTitle(): String =
+        observeSetting(SettingsPreferenceKeys.COACH_TITLE.name, "Weight Loss Coach").first()
+
+    override suspend fun coachClub(): String =
+        observeSetting(SettingsPreferenceKeys.COACH_CLUB.name, "").first()
+
+    override suspend fun coachPhone(): String =
+        observeSetting(SettingsPreferenceKeys.COACH_PHONE.name, "").first()
+
+    override suspend fun coachEmail(): String =
+        observeSetting(SettingsPreferenceKeys.COACH_EMAIL.name, "").first()
 
     override val developerModeEnabled: Flow<Boolean> = observeSetting(
         SettingsPreferenceKeys.SAVED_BLUETOOTH_DEVELOPER_MODE.name,

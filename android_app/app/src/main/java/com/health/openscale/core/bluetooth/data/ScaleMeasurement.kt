@@ -34,6 +34,7 @@ data class ScaleMeasurement(
     var bone: Float = 0.0f,  // must be in kg
     var lbm : Float = 0.0f, // must be in kg
     var bmr: Float = 0.0f,       // Basal Metabolic Rate in kcal
+    var bodyAge: Float = 0.0f,   // years, as reported by the scale
     var heartRate: Int = 0, // must be bpm
     var impedance: Double = 0.0, // Ohms — high-frequency band when the scale is dual-band
     var impedanceLow: Double = 0.0, // Ohms — low-frequency band; 0 when not reported
@@ -56,6 +57,7 @@ data class ScaleMeasurement(
         if (other.bone > 0f && this.bone <= 0f) this.bone = other.bone
         if (other.lbm > 0f && this.lbm <= 0f) this.lbm = other.lbm
         if (other.bmr > 0f && this.bmr <= 0f) this.bmr = other.bmr
+        if (other.bodyAge > 0f && this.bodyAge <= 0f) this.bodyAge = other.bodyAge
         if (other.heartRate > 0f && this.heartRate <= 0f) this.heartRate = other.heartRate
         if (other.impedance > 0.0 && this.impedance <= 0.0) this.impedance = other.impedance
         if (other.impedanceLow > 0.0 && this.impedanceLow <= 0.0) this.impedanceLow = other.impedanceLow

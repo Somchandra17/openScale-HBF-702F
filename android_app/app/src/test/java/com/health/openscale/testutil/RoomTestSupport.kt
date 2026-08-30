@@ -31,6 +31,7 @@ import com.health.openscale.core.database.MIGRATION_11_12
 import com.health.openscale.core.database.MIGRATION_12_13
 import com.health.openscale.core.database.MIGRATION_13_14
 import com.health.openscale.core.database.MIGRATION_14_15
+import com.health.openscale.core.database.MIGRATION_15_16
 import com.health.openscale.core.database.MIGRATION_1_2
 import com.health.openscale.core.database.MIGRATION_2_3
 import com.health.openscale.core.database.MIGRATION_3_4
@@ -82,6 +83,7 @@ object RoomTestSupport {
         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
         MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11,
         MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15,
+        MIGRATION_15_16,
     )
 
     /** On-disk database at the real [AppDatabase.DATABASE_NAME] path, with all migrations applied. */
@@ -243,6 +245,120 @@ object RoomTestSupport {
                 """.trimIndent()
             )
             database.execSQL("PRAGMA user_version = 1")
+        } finally {
+            database.close()
+        }
+    }
+
+    /**
+     * Writes a schema-version-15 openScale database (the modern table shape, pre-dating the
+     * BODY_AGE type and User.phone/email), used to exercise MIGRATION_15_16 end-to-end. Table
+     * DDL is copied verbatim from `app/schemas/.../15.json` so the starting point matches the
+     * real v15 schema exactly.
+     *
+     * Seeds one User (id=1, 'Asha Verma') and two pre-existing MeasurementTypes (WEIGHT
+     * displayOrder=1, BMI displayOrder=12) so a migration test can assert the new BODY_AGE row's
+     * displayOrder lands after both, proving the `MAX(displayOrder) + 1` logic in MIGRATION_15_16.
+     */
+    fun writeV15Database(file: File) {
+        val database = SQLiteDatabase.openOrCreateDatabase(file, null)
+        try {
+            database.execSQL(
+                """
+                    CREATE TABLE User (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `icon` TEXT NOT NULL,
+                        `birthDate` INTEGER NOT NULL,
+                        `gender` TEXT NOT NULL,
+                        `heightCm` REAL NOT NULL,
+                        `activityLevel` TEXT NOT NULL,
+                        `useAssistedWeighing` INTEGER NOT NULL,
+                        `amputations` TEXT NOT NULL
+                    )
+                """.trimIndent()
+            )
+            database.execSQL(
+                """
+                    CREATE TABLE user_goals (
+                        `userId` INTEGER NOT NULL,
+                        `measurementTypeId` INTEGER NOT NULL,
+                        `goalValue` REAL NOT NULL,
+                        `goalTargetDate` INTEGER,
+                        PRIMARY KEY(`userId`, `measurementTypeId`),
+                        FOREIGN KEY(`userId`) REFERENCES `User`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(`measurementTypeId`) REFERENCES `MeasurementType`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                """.trimIndent()
+            )
+            database.execSQL("CREATE INDEX index_user_goals_userId ON user_goals (`userId`)")
+            database.execSQL("CREATE INDEX index_user_goals_measurementTypeId ON user_goals (`measurementTypeId`)")
+            database.execSQL(
+                """
+                    CREATE TABLE Measurement (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `userId` INTEGER NOT NULL,
+                        `timestamp` INTEGER NOT NULL,
+                        FOREIGN KEY(`userId`) REFERENCES `User`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                """.trimIndent()
+            )
+            database.execSQL("CREATE INDEX index_Measurement_userId ON Measurement (`userId`)")
+            database.execSQL("CREATE UNIQUE INDEX index_Measurement_userId_timestamp ON Measurement (`userId`, `timestamp`)")
+            database.execSQL(
+                """
+                    CREATE TABLE MeasurementValue (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `measurementId` INTEGER NOT NULL,
+                        `typeId` INTEGER NOT NULL,
+                        `floatValue` REAL,
+                        `intValue` INTEGER,
+                        `textValue` TEXT,
+                        `dateValue` INTEGER,
+                        FOREIGN KEY(`measurementId`) REFERENCES `Measurement`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(`typeId`) REFERENCES `MeasurementType`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                """.trimIndent()
+            )
+            database.execSQL("CREATE INDEX index_MeasurementValue_measurementId ON MeasurementValue (`measurementId`)")
+            database.execSQL("CREATE INDEX index_MeasurementValue_typeId ON MeasurementValue (`typeId`)")
+            database.execSQL(
+                """
+                    CREATE TABLE MeasurementType (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `key` TEXT NOT NULL,
+                        `name` TEXT,
+                        `color` INTEGER NOT NULL,
+                        `icon` TEXT NOT NULL,
+                        `unit` TEXT NOT NULL,
+                        `inputType` TEXT NOT NULL,
+                        `displayOrder` INTEGER NOT NULL,
+                        `isDerived` INTEGER NOT NULL,
+                        `isEnabled` INTEGER NOT NULL,
+                        `isPinned` INTEGER NOT NULL,
+                        `isOnRightYAxis` INTEGER NOT NULL,
+                        `isInternal` INTEGER NOT NULL
+                    )
+                """.trimIndent()
+            )
+            database.execSQL("CREATE INDEX index_MeasurementType_key ON MeasurementType (`key`)")
+
+            database.execSQL(
+                "INSERT INTO User (id, name, icon, birthDate, gender, heightCm, " +
+                "activityLevel, useAssistedWeighing, amputations) " +
+                "VALUES (1, 'Asha Verma', 'IC_DEFAULT', 0, 'FEMALE', 162.0, 'MODERATE', 0, '{}')"
+            )
+            database.execSQL(
+                "INSERT INTO MeasurementType (id, `key`, name, color, icon, unit, inputType, " +
+                "displayOrder, isDerived, isEnabled, isPinned, isOnRightYAxis, isInternal) " +
+                "VALUES (1, 'WEIGHT', NULL, -2130771938, 'IC_WEIGHT', 'KG', 'FLOAT', 1, 0, 1, 1, 1, 0)"
+            )
+            database.execSQL(
+                "INSERT INTO MeasurementType (id, `key`, name, color, icon, unit, inputType, " +
+                "displayOrder, isDerived, isEnabled, isPinned, isOnRightYAxis, isInternal) " +
+                "VALUES (2, 'BMI', NULL, -22360, 'IC_BMI', 'NONE', 'FLOAT', 12, 1, 1, 1, 0, 0)"
+            )
+            database.execSQL("PRAGMA user_version = 15")
         } finally {
             database.close()
         }

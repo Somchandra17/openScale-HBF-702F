@@ -83,18 +83,6 @@ object OmronBodyCompositionLib {
         hasBodyAge = true
     )
 
-    /** HBF-222T-AP, HBF-227T, HBF-228T, HBF-230T: 32-byte records, whole visceral levels. */
-    val PROFILE_HBF_32 = Profile(
-        recordSize = 32,
-        slotBaseAddresses = intArrayOf(0x02C0, 0x06A0, 0x0A80, 0x0E60),
-        recordsPerSlot = 30,
-        visceralFatStep = 1.0f,
-        hasBodyAge = true
-    )
-
-    /** HBF-222T in its European/Latin-American/BCM-500 trims, which do not report body age. */
-    val PROFILE_HBF_32_NO_BODY_AGE = PROFILE_HBF_32.copy(hasBodyAge = false)
-
     // Field positions shared by every WLC-class record seen so far. The 48-byte record extends the
     // 32-byte one with segmental values; openScale has nowhere to store those, so they are skipped.
     private val FIELD_WEIGHT = OmronField(offset = 26, size = 2, startBit = 4, bitSize = 12)

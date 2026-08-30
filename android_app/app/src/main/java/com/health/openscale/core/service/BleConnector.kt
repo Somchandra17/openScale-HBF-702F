@@ -487,7 +487,8 @@ class BleConnector(
                 MeasurementTypeKey.ICW          to UnitType.PERCENT,
                 MeasurementTypeKey.PROTEIN      to UnitType.PERCENT,
                 MeasurementTypeKey.BCM          to UnitType.KG,
-                MeasurementTypeKey.BMR          to UnitType.KCAL
+                MeasurementTypeKey.BMR          to UnitType.KCAL,
+                MeasurementTypeKey.BODY_AGE     to UnitType.NONE,
             )
 
             val values = mutableListOf<MeasurementValue>()
@@ -550,6 +551,12 @@ class BleConnector(
             // its Mifflin-St Jeor BMR before the device's BIA-based BMR arrives,
             // leaving two rows for the same typeId.
             addConvertedIfValid(measurementData.bmr,                    MeasurementTypeKey.BMR)
+
+            // Body age goes in beside BMR, before WEIGHT: nothing derives BODY_AGE, so there is
+            // no recalculation for WEIGHT to trigger, but it is a device-supplied value like BMR
+            // and is kept in the same place so the ordering here doesn't have to be revisited if
+            // that ever changes.
+            addConvertedIfValid(measurementData.bodyAge, MeasurementTypeKey.BODY_AGE)
 
             // Collect all supported values from ScaleMeasurement, converting as needed.
             addConvertedIfValid(measurementData.weight,       MeasurementTypeKey.WEIGHT)

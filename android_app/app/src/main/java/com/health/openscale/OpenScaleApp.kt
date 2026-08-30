@@ -76,6 +76,7 @@ fun getDefaultMeasurementTypes(): List<MeasurementType> {
         MeasurementType(key = MeasurementTypeKey.ICW, unit = UnitType.PERCENT, color = 0xFF0288D1.toInt(), icon = MeasurementTypeIcon.IC_M_BUBBLE_CHART, isEnabled = true),
         MeasurementType(key = MeasurementTypeKey.PROTEIN, unit = UnitType.PERCENT, color = 0xFF9CCC65.toInt(), icon = MeasurementTypeIcon.IC_M_PROTEIN, isEnabled = true),
         MeasurementType(key = MeasurementTypeKey.BCM, unit = UnitType.KG, color = 0xFF558B2F.toInt(), icon = MeasurementTypeIcon.IC_M_HIVE, isEnabled = true),
+        MeasurementType(key = MeasurementTypeKey.BODY_AGE, unit = UnitType.NONE, color = 0xFF795548.toInt(), icon = MeasurementTypeIcon.IC_DEFAULT, isEnabled = true),
         MeasurementType(key = MeasurementTypeKey.CALORIES, unit = UnitType.KCAL, color = 0xFF4CAF50.toInt(), icon = MeasurementTypeIcon.IC_CALORIES, isEnabled = true),
         MeasurementType(key = MeasurementTypeKey.COMMENT, inputType = InputFieldType.TEXT, unit = UnitType.NONE, color = 0xFFE0E0E0.toInt(), icon = MeasurementTypeIcon.IC_COMMENT, isPinned = true, isEnabled = true),
         MeasurementType(key = MeasurementTypeKey.DATE, inputType = InputFieldType.DATE, unit = UnitType.NONE, color = 0xFF9E9E9E.toInt(), icon = MeasurementTypeIcon.IC_DATE, isEnabled = true),

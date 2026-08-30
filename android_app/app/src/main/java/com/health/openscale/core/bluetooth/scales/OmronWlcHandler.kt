@@ -17,6 +17,7 @@
  */
 package com.health.openscale.core.bluetooth.scales
 
+import androidx.annotation.VisibleForTesting
 import com.health.openscale.R
 import com.health.openscale.core.bluetooth.BluetoothEvent.UserInteractionType
 import com.health.openscale.core.bluetooth.data.ScaleMeasurement
@@ -102,18 +103,8 @@ class OmronWlcHandler : ScaleDeviceHandler() {
 
         private val MODELS_BY_ADVERTISED_ID: Map<Int, KnownModel> = mapOf(
             0x0001_000C to KnownModel("Omron HBF-702T", OmronBodyCompositionLib.PROFILE_HBF_702T),
-            0x0001_0011 to KnownModel("Omron KRD-703T", OmronBodyCompositionLib.PROFILE_HBF_702T),
             0x0001_040C to KnownModel("Omron HBF-702T", OmronBodyCompositionLib.PROFILE_HBF_702T),
-            0x0001_0009 to KnownModel("Omron HBF-227T", OmronBodyCompositionLib.PROFILE_HBF_32),
-            0x0001_000B to KnownModel("Omron HBF-228T", OmronBodyCompositionLib.PROFILE_HBF_32),
-            0x0001_000D to KnownModel("Omron HBF-230T", OmronBodyCompositionLib.PROFILE_HBF_32),
-            0x0001_0408 to KnownModel("Omron HBF-222T", OmronBodyCompositionLib.PROFILE_HBF_32),
-            0x0001_0110 to KnownModel(
-                "Omron BCM-500", OmronBodyCompositionLib.PROFILE_HBF_32_NO_BODY_AGE
-            ),
-            0x0001_0208 to KnownModel(
-                "Omron VIVA", OmronBodyCompositionLib.PROFILE_HBF_32_NO_BODY_AGE
-            )
+            0x0001_0011 to KnownModel("Omron KRD-703T", OmronBodyCompositionLib.PROFILE_HBF_702T),
         )
 
         /**
@@ -123,16 +114,6 @@ class OmronWlcHandler : ScaleDeviceHandler() {
         private val MODELS_BY_DEVICE_NAME: Map<String, KnownModel> = mapOf(
             "hbf-702t" to KnownModel("Omron HBF-702T", OmronBodyCompositionLib.PROFILE_HBF_702T),
             "krd-703t" to KnownModel("Omron KRD-703T", OmronBodyCompositionLib.PROFILE_HBF_702T),
-            "hbf-227t" to KnownModel("Omron HBF-227T", OmronBodyCompositionLib.PROFILE_HBF_32),
-            "hbf-228t" to KnownModel("Omron HBF-228T", OmronBodyCompositionLib.PROFILE_HBF_32),
-            "hbf-230t" to KnownModel("Omron HBF-230T", OmronBodyCompositionLib.PROFILE_HBF_32),
-            "hbf-222t" to KnownModel("Omron HBF-222T", OmronBodyCompositionLib.PROFILE_HBF_32),
-            "bcm-500" to KnownModel(
-                "Omron BCM-500", OmronBodyCompositionLib.PROFILE_HBF_32_NO_BODY_AGE
-            ),
-            "viva" to KnownModel(
-                "Omron VIVA", OmronBodyCompositionLib.PROFILE_HBF_32_NO_BODY_AGE
-            )
         )
 
         /**
@@ -489,14 +470,16 @@ class OmronWlcHandler : ScaleDeviceHandler() {
         }
     }
 
-    private fun OmronBodyCompositionLib.Record.toMeasurement(userId: Int) = ScaleMeasurement(
+    @VisibleForTesting
+    internal fun OmronBodyCompositionLib.Record.toMeasurement(userId: Int) = ScaleMeasurement(
         userId = userId,
         dateTime = timestamp,
         weight = weightKg,
         fat = bodyFatPercent ?: 0f,
         muscle = skeletalMusclePercent ?: 0f,
         visceralFat = visceralFatLevel ?: 0f,
-        bmr = bmrKcal?.toFloat() ?: 0f
+        bmr = bmrKcal?.toFloat() ?: 0f,
+        bodyAge = bodyAgeYears?.toFloat() ?: 0f,
     )
 
     // ---- chunked EEPROM reads ------------------------------------------------------------------
