@@ -21,11 +21,14 @@ import android.app.Application
 import android.util.Log
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
+import com.health.openscale.core.data.ActivityLevel
+import com.health.openscale.core.data.GenderType
 import com.health.openscale.core.data.InputFieldType
 import com.health.openscale.core.data.MeasurementType
 import com.health.openscale.core.data.MeasurementTypeIcon
 import com.health.openscale.core.data.MeasurementTypeKey
 import com.health.openscale.core.data.UnitType
+import com.health.openscale.core.data.User
 import com.health.openscale.core.database.DatabaseRepository
 import com.health.openscale.core.facade.SettingsFacade
 import com.health.openscale.core.utils.LogManager
@@ -35,6 +38,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.util.Calendar
+import java.util.TimeZone
 import javax.inject.Inject
 
 /**
@@ -83,6 +88,30 @@ fun getDefaultMeasurementTypes(): List<MeasurementType> {
         MeasurementType(key = MeasurementTypeKey.TIME, inputType = InputFieldType.TIME, unit = UnitType.NONE, color = 0xFF757575.toInt(), icon = MeasurementTypeIcon.IC_TIME, isEnabled = true),
         MeasurementType(key = MeasurementTypeKey.USER, inputType = InputFieldType.USER, unit = UnitType.NONE, color = 0xFF90A4AE.toInt(), icon = MeasurementTypeIcon.IC_USER, isEnabled = true)
     )
+}
+
+/**
+ * Generates the four fixed placeholder users seeded when the user table is empty.
+ *
+ * The Omron HBF-702T scale has exactly four on-device user slots, and this app mirrors that:
+ * four people, fixed, renameable via Settings but never added or deleted. Names are placeholders
+ * ("Person 1" .. "Person 4") intended to be renamed by the coach before first use.
+ */
+fun getDefaultUsers(): List<User> {
+    val defaultBirthDate = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
+        add(Calendar.YEAR, -18)
+    }.timeInMillis
+
+    return (1..4).map { index ->
+        User(
+            name = "Person $index",
+            birthDate = defaultBirthDate,
+            gender = GenderType.MALE,
+            heightCm = 170f,
+            activityLevel = ActivityLevel.SEDENTARY,
+            useAssistedWeighing = false,
+        )
+    }
 }
 
 @HiltAndroidApp
@@ -134,12 +163,31 @@ class OpenScaleApp : Application(), Configuration.Provider {
                 } else {
                     LogManager.d(TAG, "Not the first app start. Default data should already exist.")
                 }
+
+                seedFixedUsersIfEmpty()
             } catch (e: Exception) {
                 LogManager.e(TAG, "Error during first-start data initialization", e)
             }
         }
     }
 
+    /**
+     * Seeds the four fixed placeholder users when (and only when) the user table is empty.
+     *
+     * Deliberately independent of the `isFirstAppStart` flag above: that flag is a one-shot
+     * switch for measurement-type seeding and can be reset by a full database restore, whereas
+     * the app's four-fixed-user invariant should hold regardless. Checking table emptiness on
+     * every start keeps that invariant self-healing without ever re-inserting once users exist.
+     */
+    private suspend fun seedFixedUsersIfEmpty() {
+        val existingUsers = databaseRepository.getAllUsers().first()
+        if (existingUsers.isEmpty()) {
+            LogManager.i(TAG, "No users found. Seeding the four fixed placeholder users.")
+            getDefaultUsers().forEach { databaseRepository.insertUser(it) }
+        } else {
+            LogManager.d(TAG, "Users already exist (${existingUsers.size}). Skipping user seeding.")
+        }
+    }
 
     override val workManagerConfiguration: Configuration by lazy {
         Configuration.Builder()

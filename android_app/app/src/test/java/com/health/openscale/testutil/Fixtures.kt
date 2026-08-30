@@ -17,12 +17,15 @@
  */
 package com.health.openscale.testutil
 
+import com.health.openscale.core.data.ActivityLevel
+import com.health.openscale.core.data.GenderType
 import com.health.openscale.core.data.InputFieldType
 import com.health.openscale.core.data.Measurement
 import com.health.openscale.core.data.MeasurementType
 import com.health.openscale.core.data.MeasurementTypeKey
 import com.health.openscale.core.data.MeasurementValue
 import com.health.openscale.core.data.UnitType
+import com.health.openscale.core.data.User
 import com.health.openscale.core.model.EnrichedMeasurement
 import com.health.openscale.core.model.MeasurementValueWithType
 import com.health.openscale.core.model.MeasurementWithValues
@@ -84,5 +87,24 @@ object Fixtures {
         measurementWithValues = mwv,
         measurementWithValuesProjected = emptyList(),
         valuesWithTrend = mwv.values.map { ValueWithDifference(currentValue = it) },
+    )
+
+    /** A minimal, valid [User] for tests that only care about id/name (e.g. the switcher row). */
+    fun user(
+        id: Int,
+        name: String,
+        birthDate: Long = ts(1990, 1, 1),
+        gender: GenderType = GenderType.FEMALE,
+        heightCm: Float = 170f,
+        activityLevel: ActivityLevel = ActivityLevel.MODERATE,
+        useAssistedWeighing: Boolean = false,
+    ): User = User(
+        id = id,
+        name = name,
+        birthDate = birthDate,
+        gender = gender,
+        heightCm = heightCm,
+        activityLevel = activityLevel,
+        useAssistedWeighing = useAssistedWeighing,
     )
 }
