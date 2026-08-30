@@ -2,7 +2,7 @@
 
 **This is a fork of [oliexdev/openScale](https://github.com/oliexdev/openScale).** It is **not** the upstream general-purpose scale app.
 
-Som Chandra built this for his mummy, **Reena Chandra**, so she can run **Chandra Fitness Club** without the stock openScale clutter.
+I built this for mummy, **Reena Chandra**, so she can run **Chandra Fitness Club** without the stock openScale clutter.
 
 This fork is modified for one machine — the **Omron HBF-702T / HBF-702F** body composition scale — and for that practice. It syncs the four people on the scale, shows the latest reading, and prints a client-facing **A4 PDF** with the club name, brand logo, and footer artwork.
 
