@@ -78,6 +78,23 @@ class HistoryViewModelTest {
     }
 
     @Test
+    fun `toRows shows a dash instead of a fabricated 0_0 kg for a weigh-in with no weight value`() {
+        // Home already returns null for the same condition; this is a wrong number on screen,
+        // not a formatting nicety. The row itself must still be emitted. See finding D3.
+        val bmiOnlyType = Fixtures.type(id = 2, key = MeasurementTypeKey.BMI)
+        val noWeightMwv = Fixtures.mwv(
+            measurementId = 1,
+            timestamp = Fixtures.ts(2026, 8, 30),
+            values = listOf(Fixtures.valueWithType(bmiOnlyType, 24.8f, measurementId = 1)),
+        )
+
+        val rows = HistoryStateMapper.toRows(listOf(noWeightMwv))
+
+        assertThat(rows).hasSize(1)
+        assertThat(rows.single().weightLabel).isEqualTo("—")
+    }
+
+    @Test
     fun `toRows formats weight with one decimal, a kg suffix, and a period decimal point regardless of default locale`() {
         val original = Locale.getDefault()
         try {

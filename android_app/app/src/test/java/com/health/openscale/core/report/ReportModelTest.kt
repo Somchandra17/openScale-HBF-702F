@@ -72,6 +72,22 @@ class ReportModelTest {
     }
 
     @Test
+    fun `BMI row is classified against Asian-Pacific cutoffs, independent of age or sex`() {
+        val row = rowsFor("BMI" to 24.8f).single { it.label == "BMI" }
+        assertThat(row.reading).isEqualTo("24.8")
+        assertThat(row.status).isEqualTo("Overweight")
+        assertThat(row.normalRange).isEqualTo("18.0 – 22.9")
+    }
+
+    @Test
+    fun `skeletal muscle row is classified against the client's age and sex`() {
+        val row = rowsFor("MUSCLE" to 31.0f).single { it.label == "Skeletal muscle" }
+        assertThat(row.reading).isEqualTo("31.0 %")
+        assertThat(row.status).isEqualTo("High")
+        assertThat(row.normalRange).isEqualTo("24.3 – 30.3 %")
+    }
+
+    @Test
     fun `body age row shows the delta against actual age`() {
         val row = rowsFor("BODY_AGE" to 41f).single { it.label == "Body age" }
         assertThat(row.reading).isEqualTo("41 years")
@@ -96,5 +112,42 @@ class ReportModelTest {
     fun `water is never a row`() {
         // The HBF-702T does not measure it.
         assertThat(rowsFor("WEIGHT" to 68.4f).map { it.label }).doesNotContain("Water")
+    }
+
+    // --- Incomplete profile: age/sex-dependent rows must not guess -------------------
+    //
+    // A client whose birth date was never set carries CLIENT_AGE_UNKNOWN (see
+    // ReportUseCases.buildModel and OpenScaleApp.getDefaultUsers). Spec §6: age/sex-dependent
+    // rows must fall back to Band.NONE with a footnote rather than guessing a band. See
+    // finding B4.
+
+    private val clientWithUnsetProfile = client.copy(ageYears = CLIENT_AGE_UNKNOWN)
+
+    @Test
+    fun `an unset profile yields Band NONE (a dash) for body fat, not a guessed verdict`() {
+        val row = ReportRowBuilder.build(mapOf("BODY_FAT" to 30.0f), clientWithUnsetProfile)
+            .single { it.label == "Body fat" }
+        assertThat(row.status).isEqualTo("—")
+        assertThat(row.normalRange).isEqualTo("—")
+    }
+
+    @Test
+    fun `an unset profile yields Band NONE (a dash) for skeletal muscle, not a guessed verdict`() {
+        val row = ReportRowBuilder.build(mapOf("MUSCLE" to 31.0f), clientWithUnsetProfile)
+            .single { it.label == "Skeletal muscle" }
+        assertThat(row.status).isEqualTo("—")
+        assertThat(row.normalRange).isEqualTo("—")
+    }
+
+    @Test
+    fun `a completed profile still bands body fat and skeletal muscle correctly`() {
+        // Same values as the unset-profile cases above, but with a real age/sex on file: both
+        // rows must band, proving the fallback is scoped to the missing-profile case only.
+        val rows = ReportRowBuilder.build(mapOf("BODY_FAT" to 30.0f, "MUSCLE" to 31.0f), client)
+
+        val bodyFat = rows.single { it.label == "Body fat" }
+        assertThat(bodyFat.status).isEqualTo("Normal") // 34yo female normal range is 21.0-32.9
+        val muscle = rows.single { it.label == "Skeletal muscle" }
+        assertThat(muscle.status).isEqualTo("High") // 34yo female normal range tops out at 30.3
     }
 }

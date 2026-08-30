@@ -22,6 +22,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import com.health.openscale.core.facade.SettingsFacadeImpl
 import com.health.openscale.testutil.MainDispatcherRule
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -111,5 +112,27 @@ class CoachProfileViewModelTest {
         }
         assertThat(persisted.club).isEqualTo("Fit Studio")
         assertThat(persisted.email).isEqualTo("reena@example.com")
+    }
+
+    @Test
+    fun `save invokes onSaved only after the edited state has actually been persisted`() = runBlocking {
+        // Save was previously silent -- no snackbar, no navigation -- so the screen now drives
+        // both from this callback. It must never fire before the write lands, or the coach
+        // could be told "saved" (and popped back) before the profile printed on the client
+        // sheet's masthead is actually on disk. See finding B2.
+        val facade = newFacade()
+        val vm = CoachProfileViewModel(facade)
+        withTimeout(5_000) { vm.uiState.first { it.name == "Reena Chandra" } } // wait past the initial load
+        vm.onChange(vm.uiState.value.copy(club = "Fit Studio"))
+
+        val callbackFired = CompletableDeferred<String>()
+        vm.save {
+            // Read the facade directly (not vm.uiState, which is updated eagerly by onChange
+            // regardless of save) to prove the WRITE, not just the in-memory edit, preceded us.
+            callbackFired.complete(CoachProfileUiState.load(facade).club)
+        }
+
+        val clubSeenInCallback = withTimeout(5_000) { callbackFired.await() }
+        assertThat(clubSeenInCallback).isEqualTo("Fit Studio")
     }
 }

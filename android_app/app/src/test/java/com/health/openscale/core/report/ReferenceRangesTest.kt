@@ -140,4 +140,80 @@ class ReferenceRangesTest {
         val c = ReferenceRanges.classify(MeasurementTypeKey.BODY_FAT, 35.9f, 85, GenderType.FEMALE)
         assertThat(c.band).isEqualTo(Band.NORMAL)
     }
+
+    // --- Interior age-bracket seams ---------------------------------------------
+    //
+    // Only the outer clamps (19, 85) were previously tested; the interior seams where the
+    // age bracket actually switches were unguarded, and a transposed boundary there would be
+    // silent — these thresholds decide what a real client is told. See finding D1.
+    //
+    // Note: this implementation has exactly two interior seams per metric/sex — 39/40 and
+    // 59/60 (the 60+ bracket is the oldest; there is no separate 80+ bracket to seam-test).
+    // Each value below sits strictly between the two neighbouring brackets' cut-offs, so the
+    // band genuinely differs on either side of the seam — not just the printed range string.
+
+    @Test
+    fun `body fat 39_40 seam for women- HIGH just under, NORMAL at 40`() {
+        val under = ReferenceRanges.classify(MeasurementTypeKey.BODY_FAT, 33.4f, 39, GenderType.FEMALE)
+        val at = ReferenceRanges.classify(MeasurementTypeKey.BODY_FAT, 33.4f, 40, GenderType.FEMALE)
+        assertThat(under.band).isEqualTo(Band.HIGH)
+        assertThat(at.band).isEqualTo(Band.NORMAL)
+    }
+
+    @Test
+    fun `body fat 39_40 seam for men- HIGH just under, NORMAL at 40`() {
+        val under = ReferenceRanges.classify(MeasurementTypeKey.BODY_FAT, 20.9f, 39, GenderType.MALE)
+        val at = ReferenceRanges.classify(MeasurementTypeKey.BODY_FAT, 20.9f, 40, GenderType.MALE)
+        assertThat(under.band).isEqualTo(Band.HIGH)
+        assertThat(at.band).isEqualTo(Band.NORMAL)
+    }
+
+    @Test
+    fun `body fat 59_60 seam for women- HIGH just under, NORMAL at 60`() {
+        val under = ReferenceRanges.classify(MeasurementTypeKey.BODY_FAT, 34.9f, 59, GenderType.FEMALE)
+        val at = ReferenceRanges.classify(MeasurementTypeKey.BODY_FAT, 34.9f, 60, GenderType.FEMALE)
+        assertThat(under.band).isEqualTo(Band.HIGH)
+        assertThat(at.band).isEqualTo(Band.NORMAL)
+    }
+
+    @Test
+    fun `body fat 59_60 seam for men- HIGH just under, NORMAL at 60`() {
+        val under = ReferenceRanges.classify(MeasurementTypeKey.BODY_FAT, 22.9f, 59, GenderType.MALE)
+        val at = ReferenceRanges.classify(MeasurementTypeKey.BODY_FAT, 22.9f, 60, GenderType.MALE)
+        assertThat(under.band).isEqualTo(Band.HIGH)
+        assertThat(at.band).isEqualTo(Band.NORMAL)
+    }
+
+    @Test
+    fun `skeletal muscle 39_40 seam for women- NORMAL just under, HIGH at 40`() {
+        // Muscle cut-offs move DOWN with age (unlike body fat), so the seam flips direction.
+        val under = ReferenceRanges.classify(MeasurementTypeKey.MUSCLE, 30.2f, 39, GenderType.FEMALE)
+        val at = ReferenceRanges.classify(MeasurementTypeKey.MUSCLE, 30.2f, 40, GenderType.FEMALE)
+        assertThat(under.band).isEqualTo(Band.NORMAL)
+        assertThat(at.band).isEqualTo(Band.HIGH)
+    }
+
+    @Test
+    fun `skeletal muscle 39_40 seam for men- NORMAL just under, HIGH at 40`() {
+        val under = ReferenceRanges.classify(MeasurementTypeKey.MUSCLE, 39.2f, 39, GenderType.MALE)
+        val at = ReferenceRanges.classify(MeasurementTypeKey.MUSCLE, 39.2f, 40, GenderType.MALE)
+        assertThat(under.band).isEqualTo(Band.NORMAL)
+        assertThat(at.band).isEqualTo(Band.HIGH)
+    }
+
+    @Test
+    fun `skeletal muscle 59_60 seam for women- NORMAL just under, HIGH at 60`() {
+        val under = ReferenceRanges.classify(MeasurementTypeKey.MUSCLE, 30.0f, 59, GenderType.FEMALE)
+        val at = ReferenceRanges.classify(MeasurementTypeKey.MUSCLE, 30.0f, 60, GenderType.FEMALE)
+        assertThat(under.band).isEqualTo(Band.NORMAL)
+        assertThat(at.band).isEqualTo(Band.HIGH)
+    }
+
+    @Test
+    fun `skeletal muscle 59_60 seam for men- NORMAL just under, HIGH at 60`() {
+        val under = ReferenceRanges.classify(MeasurementTypeKey.MUSCLE, 39.0f, 59, GenderType.MALE)
+        val at = ReferenceRanges.classify(MeasurementTypeKey.MUSCLE, 39.0f, 60, GenderType.MALE)
+        assertThat(under.band).isEqualTo(Band.NORMAL)
+        assertThat(at.band).isEqualTo(Band.HIGH)
+    }
 }

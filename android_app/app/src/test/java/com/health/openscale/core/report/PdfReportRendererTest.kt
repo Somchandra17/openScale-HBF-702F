@@ -218,6 +218,29 @@ class PdfReportRendererTest {
     }
 
     @Test
+    fun `an unknown client age prints a dash in the Age cell, never a negative sentinel`() {
+        // Regression for finding B4: the sheet must not print the CLIENT_AGE_UNKNOWN sentinel
+        // (-1) verbatim, and the footnote must not claim an age/sex basis it doesn't have.
+        val m = model().copy(client = model().client.copy(ageYears = CLIENT_AGE_UNKNOWN))
+        val canvas = recordDraw(m)
+
+        val ageCell = canvas.texts.first { it.x == col2 + 55f && it.text.contains("/") }
+        assertThat(ageCell.text).doesNotContain("-1")
+        assertThat(ageCell.text).startsWith("—")
+
+        val footnote = canvas.texts.first { it.text.contains("Client age") || it.text.contains("Ranges shown") }
+        assertThat(footnote.text).doesNotContain("-1")
+        assertThat(footnote.text).doesNotContain("year-old")
+    }
+
+    @Test
+    fun `a known client age still prints the sheet's original basis footnote`() {
+        val canvas = recordDraw() // model()'s client is a real 34-year-old female
+        val footnote = canvas.texts.first { it.text.contains("Ranges shown") }
+        assertThat(footnote.text).isEqualTo("Ranges shown are for a 34-year-old female.")
+    }
+
+    @Test
     fun `no drawn string carries app branding`() {
         // Global constraint: the sheet is the coach's, not the app's. PdfDocument itself
         // never writes the package id into the file (Skia only emits its own Producer

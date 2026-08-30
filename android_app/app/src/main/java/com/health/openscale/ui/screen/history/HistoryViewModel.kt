@@ -48,6 +48,7 @@ object HistoryStateMapper {
     // com.health.openscale.core.report.ReportRowBuilder, which pins the same way).
     private val L = Locale.US
     private val DATE_FORMAT = SimpleDateFormat("d MMM yyyy", L)
+    private const val DASH = "—"
 
     /**
      * [measurements] must already be newest-first, as returned by
@@ -59,15 +60,19 @@ object HistoryStateMapper {
     fun toRows(measurements: List<MeasurementWithValues>): List<HistoryRow> =
         measurements.mapIndexed { index, mwv ->
             val values = valuesByKey(mwv)
-            val weightKg = values[MeasurementTypeKey.WEIGHT.name] ?: 0f
+            // Nullable, not defaulted to 0f: a weigh-in with no weight value must print a dash,
+            // not a fabricated "0.0 kg" — Home already gets this right for the same condition.
+            // The row itself is still emitted (never dropped): a constant row shape matters
+            // elsewhere (the Report row picker reads this same list). See finding D3.
+            val weightKg = values[MeasurementTypeKey.WEIGHT.name]
             val previousWeight = measurements.getOrNull(index + 1)
                 ?.let { valuesByKey(it)[MeasurementTypeKey.WEIGHT.name] }
 
             HistoryRow(
                 measurementId = mwv.measurement.id,
                 dateLabel = DATE_FORMAT.format(Date(mwv.measurement.timestamp)),
-                weightLabel = String.format(L, "%.1f kg", weightKg),
-                deltaLabel = formatDelta(previousWeight?.let { weightKg - it } ?: 0f),
+                weightLabel = weightKg?.let { String.format(L, "%.1f kg", it) } ?: DASH,
+                deltaLabel = formatDelta(weightKg?.let { w -> previousWeight?.let { w - it } } ?: 0f),
             )
         }
 
